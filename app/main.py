@@ -1,3 +1,5 @@
+from app.db import get_connection
+
 from fastapi import FastAPI
 from app.routes import users, expenses
 
