@@ -5,6 +5,7 @@ from pydantic import BaseModel
 router = APIRouter()
 
 class UserCreate(BaseModel):
+    id: int  # Endi ID ham majburiy!
     name: str
     email: str
 
@@ -13,12 +14,13 @@ def create_user(user: UserCreate):
     conn = get_connection()
     try:
         cursor = conn.cursor()
+        # INSERT so'roviga 'id' ustunini qo'shamiz
         cursor.execute(
-            "INSERT INTO users (name, email) VALUES (?, ?)",
-            (user.name, user.email)
+            "INSERT INTO users (id, name, email) VALUES (?, ?, ?)",
+            (user.id, user.name, user.email)
         )
         conn.commit()
-        return {"message": "User created"}
+        return {"message": f"User {user.id} muvaffaqiyatli yaratildi"}
     except Exception as e:
         return {"error": str(e)}
     finally:
@@ -31,16 +33,9 @@ def get_users():
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, email FROM users")
         rows = cursor.fetchall()
-
         result = []
         for row in rows:
-            # Diqqat! Bu qatorlar 'for' dan 4 ta probel ichkarida bo'lishi shart
-            result.append({
-                "id": row["id"],
-                "name": row["name"],
-                "email": row["email"]
-            })
-
+            result.append({"id": row["id"], "name": row["name"], "email": row["email"]})
         return result
     except Exception as e:
         return {"error": str(e)}
@@ -54,7 +49,7 @@ def delete_user(user_id: int):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
-        return {"message": f"User {user_id} muvaffaqiyatli o'chirildi"}
+        return {"message": f"Foydalanuvchi {user_id} o'chirildi"}
     except Exception as e:
         return {"error": str(e)}
     finally:
