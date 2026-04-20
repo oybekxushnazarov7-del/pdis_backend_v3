@@ -46,3 +46,16 @@ def get_users():
         return {"error": str(e)}
     finally:
         conn.close()
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return {"message": f"User {user_id} muvaffaqiyatli o'chirildi"}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
