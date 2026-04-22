@@ -16,7 +16,7 @@ class RegisterData(BaseModel):
 
 
 class UserCreate(BaseModel):
-    id: int
+    # ID olib tashlandi, chunki baza o'zi SERIAL orqali yaratadi
     name: str
     email: EmailStr
 
@@ -89,16 +89,14 @@ def create_user(user: UserCreate, account_id: int = Depends(get_current_account_
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        # ID band emasligini tekshirish
-        cursor.execute("SELECT id FROM users WHERE id = %s", (user.id,))
-        if cursor.fetchone():
-            raise HTTPException(status_code=400, detail=f"ID {user.id} allaqachon band")
+        # TO'G'RILANDI: id ustuni olib tashlandi, baza SERIAL orqali o'zi qo'yadi
         cursor.execute(
-            "INSERT INTO users (id, name, email, account_id) VALUES (%s, %s, %s, %s)",
-            (user.id, user.name, user.email, account_id)
+            "INSERT INTO users (name, email, account_id) VALUES (%s, %s, %s) RETURNING id",
+            (user.name, user.email, account_id)
         )
+        new_id = cursor.fetchone()[0]
         conn.commit()
-        return {"message": "User qo'shildi!", "id": user.id, "name": user.name, "email": user.email}
+        return {"message": "User qo'shildi!", "id": new_id, "name": user.name, "email": user.email}
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
         raise HTTPException(status_code=400, detail="Bu email allaqachon mavjud")
