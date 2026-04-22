@@ -1,5 +1,7 @@
-import sqlite3
+import psycopg2
+
+DATABASE_URL = "postgresql://postgres.ubatpburtsliyjrhbgyj:Xushnazarov%40123@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres"
 
 def get_connection():
-    conn = sqlite3.connect("pdis.db")
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
