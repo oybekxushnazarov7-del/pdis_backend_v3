@@ -1,8 +1,14 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.db import get_connection
-from app.routes import users, expenses
+from app.routes.users import auth_router, users_router
+from app.routes import expenses
 
-app = FastAPI()
+tags_metadata = [
+    {"name": "Auth"},
+    {"name": "Users"},
+    {"name": "Expenses"},
+]
 
 
 def create_tables():
@@ -11,16 +17,18 @@ def create_tables():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT UNIQUE
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
         )
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            amount REAL,
-            category TEXT,
+            user_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
@@ -28,14 +36,26 @@ def create_tables():
     conn.close()
 
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     create_tables()
+    yield
 
-# Routerlarni ulash
-app.include_router(users.router)
+
+app = FastAPI(
+    title="PDIS API with Auth",
+    lifespan=lifespan,
+    openapi_tags=tags_metadata
+)
+
+app.include_router(auth_router)
+app.include_router(users_router)
 app.include_router(expenses.router)
+
 
 @app.get("/")
 def home():
-    return {"message": "Project successfully working!"}
+    return {
+        "message": "PDIS API ishlamoqda 🚀",
+        "docs": "/docs"
+    }
