@@ -13,19 +13,19 @@ class ExpenseCreate(BaseModel):
     amount: float
 
 
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
+def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Token noto'g'ri yoki muddati o'tgan")
-    user_id = payload.get("user_id")
-    if user_id is None:
+    account_id = payload.get("user_id")
+    if account_id is None:
         raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
-    return user_id
+    return account_id
 
 
 # 1️⃣ POST
 @router.post("/")
-def add_expense(expense: ExpenseCreate, user_id: int = Depends(get_current_user_id)):
+def add_expense(expense: ExpenseCreate, account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -33,8 +33,8 @@ def add_expense(expense: ExpenseCreate, user_id: int = Depends(get_current_user_
         if cursor.fetchone():
             raise HTTPException(status_code=400, detail=f"ID {expense.id} allaqachon band")
         cursor.execute(
-            "INSERT INTO expenses (id, user_id, category, amount) VALUES (%s, %s, %s, %s)",
-            (expense.id, user_id, expense.category, expense.amount)
+            "INSERT INTO expenses (id, account_id, category, amount) VALUES (%s, %s, %s, %s)",
+            (expense.id, account_id, expense.category, expense.amount)
         )
         conn.commit()
         return {"message": "Xarajat qo'shildi", "id": expense.id, "category": expense.category, "amount": expense.amount}
@@ -49,13 +49,13 @@ def add_expense(expense: ExpenseCreate, user_id: int = Depends(get_current_user_
 
 # 2️⃣ GET
 @router.get("/")
-def get_expenses(user_id: int = Depends(get_current_user_id)):
+def get_expenses(account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, category, amount, created_at FROM expenses WHERE user_id = %s",
-            (user_id,)
+            "SELECT id, category, amount, created_at FROM expenses WHERE account_id = %s",
+            (account_id,)
         )
         rows = cursor.fetchall()
         return [{"id": r[0], "category": r[1], "amount": r[2], "created_at": r[3]} for r in rows]
@@ -67,13 +67,13 @@ def get_expenses(user_id: int = Depends(get_current_user_id)):
 
 # 3️⃣ DELETE
 @router.delete("/{expense_id}")
-def delete_expense(expense_id: int, user_id: int = Depends(get_current_user_id)):
+def delete_expense(expense_id: int, account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "DELETE FROM expenses WHERE id = %s AND user_id = %s",
-            (expense_id, user_id)
+            "DELETE FROM expenses WHERE id = %s AND account_id = %s",
+            (expense_id, account_id)
         )
         conn.commit()
         if cursor.rowcount == 0:

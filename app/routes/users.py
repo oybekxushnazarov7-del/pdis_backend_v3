@@ -9,7 +9,7 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 users_router = APIRouter(prefix="/users", tags=["Users"])
 
 
-class LoginData(BaseModel):
+class RegisterData(BaseModel):
     name: str
     email: EmailStr
     password: str
@@ -21,27 +21,27 @@ class UserCreate(BaseModel):
     email: EmailStr
 
 
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
+def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Token noto'g'ri yoki muddati o'tgan")
-    user_id = payload.get("user_id")
-    if user_id is None:
+    account_id = payload.get("user_id")
+    if account_id is None:
         raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
-    return user_id
+    return account_id
 
 
 # ==================== AUTH ====================
 
 @auth_router.post("/register")
-def register(user: LoginData):
+def register(data: RegisterData):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        hashed_pwd = get_hash(user.password)
+        hashed_pwd = get_hash(data.password)
         cursor.execute(
-            "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
-            (user.name, user.email, hashed_pwd)
+            "INSERT INTO accounts (name, email, password) VALUES (%s, %s, %s)",
+            (data.name, data.email, hashed_pwd)
         )
         conn.commit()
         return {"message": "Muvaffaqiyatli ro'yxatdan o'tdingiz!"}
@@ -63,18 +63,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, email, password FROM users WHERE email = %s",
+            "SELECT id, name, email, password FROM accounts WHERE email = %s",
             (form_data.username,)
         )
-        user = cursor.fetchone()
-
-        if not user:
+        account = cursor.fetchone()
+        if not account:
             raise HTTPException(status_code=400, detail="Foydalanuvchi topilmadi")
-
-        if not verify(form_data.password, user[3]):
+        if not verify(form_data.password, account[3]):
             raise HTTPException(status_code=400, detail="Parol noto'g'ri")
-
-        token = create_token({"user_id": user[0]})
+        token = create_token({"user_id": account[0]})
         return {"access_token": token, "token_type": "bearer"}
     except HTTPException:
         raise
@@ -86,20 +83,19 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 # ==================== USERS ====================
 
-# 1️⃣ POST
+# 1️⃣ POST — foydalanuvchi o'zi qo'shadi
 @users_router.post("/")
-def create_user(user: UserCreate, current_user_id: int = Depends(get_current_user_id)):
+def create_user(user: UserCreate, account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id FROM users WHERE id = %s", (user.id,)
-        )
+        # ID band emasligini tekshirish
+        cursor.execute("SELECT id FROM users WHERE id = %s", (user.id,))
         if cursor.fetchone():
             raise HTTPException(status_code=400, detail=f"ID {user.id} allaqachon band")
         cursor.execute(
-            "INSERT INTO users (id, name, email, password) VALUES (%s, %s, %s, %s)",
-            (user.id, user.name, user.email, "")
+            "INSERT INTO users (id, name, email, account_id) VALUES (%s, %s, %s, %s)",
+            (user.id, user.name, user.email, account_id)
         )
         conn.commit()
         return {"message": "User qo'shildi!", "id": user.id, "name": user.name, "email": user.email}
@@ -115,32 +111,37 @@ def create_user(user: UserCreate, current_user_id: int = Depends(get_current_use
         conn.close()
 
 
-# 2️⃣ GET
+# 2️⃣ GET — faqat o'zi qo'shgan userlarni ko'rish
 @users_router.get("/")
-def get_users(current_user_id: int = Depends(get_current_user_id)):
+def get_users(account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email FROM users")
+        cursor.execute(
+            "SELECT id, name, email FROM users WHERE account_id = %s",
+            (account_id,)
+        )
         rows = cursor.fetchall()
         return [{"id": r[0], "name": r[1], "email": r[2]} for r in rows]
     finally:
         conn.close()
 
 
-# 3️⃣ DELETE
+# 3️⃣ DELETE — faqat o'zinikini o'chirish
 @users_router.delete("/{user_id}")
-def delete_user(user_id: int, current_user_id: int = Depends(get_current_user_id)):
+def delete_user(user_id: int, account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE id = %s", (user_id,))
+        cursor.execute(
+            "SELECT id FROM users WHERE id = %s AND account_id = %s",
+            (user_id, account_id)
+        )
         if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail=f"ID {user_id} topilmadi")
-        cursor.execute("DELETE FROM expenses WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+            raise HTTPException(status_code=404, detail=f"ID {user_id} topilmadi yoki sizga tegishli emas")
+        cursor.execute("DELETE FROM users WHERE id = %s AND account_id = %s", (user_id, account_id))
         conn.commit()
-        return {"message": f"ID {user_id} user va uning barcha xarajatlari o'chirildi"}
+        return {"message": f"ID {user_id} o'chirildi"}
     except HTTPException:
         raise
     except Exception as e:

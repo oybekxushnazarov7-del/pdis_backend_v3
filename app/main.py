@@ -15,8 +15,9 @@ def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Login/Register uchun
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS accounts (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
@@ -24,14 +25,23 @@ def create_tables():
         )
     """)
 
+    # Foydalanuvchi o'zi qo'shadigan
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            account_id INTEGER REFERENCES accounts(id)
+        )
+    """)
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL,
+            id INTEGER PRIMARY KEY,
+            account_id INTEGER NOT NULL REFERENCES accounts(id),
             amount REAL NOT NULL,
             category TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
