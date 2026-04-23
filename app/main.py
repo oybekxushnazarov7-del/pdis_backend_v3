@@ -8,18 +8,9 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
-# Teglar (Swagger uchun)
-tags_metadata = [
-    {"name": "Auth", "description": "Ro'yxatdan o'tish va login"},
-    {"name": "Users", "description": "Foydalanuvchilarni boshqarish"},
-    {"name": "Expenses", "description": "Xarajatlar bilan ishlash"},
-]
-
-# Ma'lumotlar bazasi jadvallarini yaratish
 def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             id SERIAL PRIMARY KEY,
@@ -28,7 +19,6 @@ def create_tables():
             password TEXT NOT NULL
         )
     """)
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY, 
@@ -37,7 +27,6 @@ def create_tables():
             account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE
         )
     """)
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id SERIAL PRIMARY KEY,
@@ -47,7 +36,6 @@ def create_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
     conn.commit()
     conn.close()
 
@@ -56,14 +44,8 @@ async def lifespan(app: FastAPI):
     create_tables()
     yield
 
-# FastAPI ilovasini yaratish
-app = FastAPI(
-    title="PDIS API with Auth",
-    lifespan=lifespan,
-    openapi_tags=tags_metadata
-)
+app = FastAPI(title="PDIS API", lifespan=lifespan)
 
-# ✅ CORS sozlamalari
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -72,19 +54,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routerlarni ulash
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# --- FRONTEND ULASH QISMI ---
-
-# 1. Static fayllarni (JS, CSS) ulash
-# directory="app/static" bo'lishi kerak, chunki static papkangiz app ichida
+# ✅ MUHIM: Static fayllarni ulash
+# Agar static papkasi 'app' ichida bo'lsa:
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# 2. Asosiy sahifada HTML faylni ko'rsatish
 @app.get("/")
 async def home():
-    # Bu qism JSON o'rniga haqiqiy login oynasini chiqaradi
+    # Eski return {"message": ...} qatorini O'CHIRDIK.
+    # Endi u faqat index.html faylini yuboradi.
     return FileResponse("app/static/index.html")
