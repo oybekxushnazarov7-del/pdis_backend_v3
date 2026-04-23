@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles # Frontend uchun kerak
-from fastapi.responses import FileResponse  # Frontend uchun kerak
+from fastapi.staticfiles import StaticFiles 
+from fastapi.responses import FileResponse 
+import os
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
@@ -17,7 +18,6 @@ def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 1. Accounts jadvali
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             id SERIAL PRIMARY KEY,
@@ -27,7 +27,6 @@ def create_tables():
         )
     """)
 
-    # 2. Users jadvali (SERIAL va ON DELETE CASCADE qo'shildi)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY, 
@@ -37,7 +36,6 @@ def create_tables():
         )
     """)
 
-    # 3. Expenses jadvali (SERIAL va ON DELETE CASCADE qo'shildi)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id SERIAL PRIMARY KEY,
@@ -62,7 +60,7 @@ app = FastAPI(
     openapi_tags=tags_metadata
 )
 
-# ✅ CORS sozlamalari - Front-end ulanishi uchun shart
+# ✅ CORS sozlamalari
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -76,14 +74,11 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# ✅ Frontend fayllari uchun (static papkasi yaratganingizdan keyin)
-# app.mount("/static", StaticFiles(directory="static"), name="static")
+# ✅ FRONTEND UCHUN ASOSIY QISMLAR (Izohdan chiqarildi)
+# Static fayllar (JS, CSS) joylashgan papka
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/")
-def home():
-    # Agar frontend tayyor bo'lsa, FileResponse("static/index.html") qaytarish mumkin
-    return {
-        "message": "PDIS API ishlamoqda 🚀",
-        "docs": "/docs",
-        "version": "3.0"
-    }
+async def home():
+    # Asosiy sahifaga kirganda index.html faylini ko'rsatish
+    return FileResponse("app/static/index.html")
