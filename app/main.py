@@ -8,12 +8,14 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
+# Teglar (Swagger uchun)
 tags_metadata = [
     {"name": "Auth", "description": "Ro'yxatdan o'tish va login"},
     {"name": "Users", "description": "Foydalanuvchilarni boshqarish"},
     {"name": "Expenses", "description": "Xarajatlar bilan ishlash"},
 ]
 
+# Ma'lumotlar bazasi jadvallarini yaratish
 def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
@@ -54,6 +56,7 @@ async def lifespan(app: FastAPI):
     create_tables()
     yield
 
+# FastAPI ilovasini yaratish
 app = FastAPI(
     title="PDIS API with Auth",
     lifespan=lifespan,
@@ -74,11 +77,14 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# ✅ FRONTEND UCHUN ASOSIY QISMLAR (Izohdan chiqarildi)
-# Static fayllar (JS, CSS) joylashgan papka
+# --- FRONTEND ULASH QISMI ---
+
+# 1. Static fayllarni (JS, CSS) ulash
+# directory="app/static" bo'lishi kerak, chunki static papkangiz app ichida
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+# 2. Asosiy sahifada HTML faylni ko'rsatish
 @app.get("/")
 async def home():
-    # Asosiy sahifaga kirganda index.html faylini ko'rsatish
+    # Bu qism JSON o'rniga haqiqiy login oynasini chiqaradi
     return FileResponse("app/static/index.html")
