@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
@@ -15,7 +16,6 @@ def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Login/Register uchun
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             id SERIAL PRIMARY KEY,
@@ -25,7 +25,6 @@ def create_tables():
         )
     """)
 
-    # Foydalanuvchi o'zi qo'shadigan
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
@@ -59,6 +58,15 @@ app = FastAPI(
     title="PDIS API with Auth",
     lifespan=lifespan,
     openapi_tags=tags_metadata
+)
+
+# ✅ CORS — Netlify ga ruxsat
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router)
