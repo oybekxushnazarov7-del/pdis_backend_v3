@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>PDIS - Shaxsiy Boshqaruv</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: white; display: flex; justify-content: center; padding-top: 50px; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 10px; width: 350px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
+        button { width: 100%; padding: 10px; background: #6200ee; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #data-section { display: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card" id="auth-card">
+        <h2>Kirish</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Parol">
+        <button onclick="login()">Kirish</button>
+    </div>
+
+    <div class="card" id="data-section">
+        <h2>Sizning ma'lumotlaringiz</h2>
+        <ul id="user-list"></ul>
+        <button onclick="logout()" style="background: #cf6679;">Chiqish</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
