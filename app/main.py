@@ -9,7 +9,7 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
-# ✅ Fayl joylashgan papkani aniq topamiz
+# ✅ Absolyut yo'l
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "app", "static")
 
@@ -66,7 +66,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# ✅ Mutlaq yo'l bilan static
+# ✅ Absolyut yo'l bilan static
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
