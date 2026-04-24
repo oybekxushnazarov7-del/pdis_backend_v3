@@ -9,21 +9,10 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
-# ✅ Papka manzillarini tekshirish
+# ✅ Papka manzili (Sizning strukturangiz uchun maxsus)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Render va mahalliy kompyuter uchun barcha variantlarni tekshiramiz
-possible_paths = [
-    os.path.join(BASE_DIR, "static"),           # Ildizda bo'lsa
-    os.path.join(BASE_DIR, "app", "static"),    # app ichida bo'lsa
-    "/opt/render/project/src/static"            # Render-ning absolyut manzili
-]
-
-STATIC_DIR = None
-for path in possible_paths:
-    if os.path.exists(path):
-        STATIC_DIR = path
-        break
+# Rasmda static papkasi app ichida ko'rinyapti
+STATIC_DIR = os.path.join(BASE_DIR, "app", "static")
 
 def create_tables():
     try:
@@ -44,28 +33,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PDIS API", lifespan=lifespan)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
 # ✅ Static fayllarni ulash
-if STATIC_DIR:
+if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 async def home():
-    if STATIC_DIR:
-        index_path = os.path.join(STATIC_DIR, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     
-    # Agar topilmasa, tizimda nima borligini ko'rish uchun (faqat debug)
+    # Agar topilmasa, qayerdan qidirayotganini ko'rsatadi
     return {
-        "error": "index.html hali ham topilmadi",
-        "current_dir": BASE_DIR,
-        "searched_in": possible_paths,
-        "found_static_dir": STATIC_DIR,
-        "existing_files": os.listdir(BASE_DIR) if os.path.exists(BASE_DIR) else "dir not found"
+        "error": "index.html topilmadi",
+        "looking_at": index_path,
+        "base_dir": BASE_DIR,
+        "app_folder_exists": os.path.exists(os.path.join(BASE_DIR, "app")),
+        "static_folder_exists": os.path.exists(STATIC_DIR)
     }
