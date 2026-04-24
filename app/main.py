@@ -9,48 +9,50 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
-# ✅ Absolyut yo'l
+# ✅ To'g'ri absolyut yo'lni aniqlash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, "app", "static")
 
+# Rasmdagi strukturaga ko'ra, static papkasi ildizda (root) joylashgan:
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 def create_tables():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS accounts (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS expenses (
-            id SERIAL PRIMARY KEY,
-            account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-            amount REAL NOT NULL,
-            category TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS accounts (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id SERIAL PRIMARY KEY,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Ma'lumotlar bazasida xato: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
     yield
-
 
 app = FastAPI(title="PDIS API", lifespan=lifespan)
 
@@ -62,14 +64,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Routerlar
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# ✅ Absolyut yo'l bilan static
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
+# ✅ Static fayllarni ulash (index.html ichidagi js/css lar ishlashi uchun)
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 async def home():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "index.html topilmadi", "path": index_path}
