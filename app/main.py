@@ -5,20 +5,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-# Loyihangizdagi mavjud modullarni import qilish
+# Modullarni import qilish
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
+# ✅ YANGI: auth.py dagi router (refresh endpointi bor router)
+from app.auth import router as auth_methods_router 
 
-# ✅ Papka manzillarini aniqlash (Ildiz papkada bo'lsa)
+# Papka manzillarini aniqlash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 def create_tables():
-    """Ma'lumotlar bazasi jadvallarini yaratish"""
+    """Ma'lumotlar bazasi jadvallarini yaratish (ID SERIAL bilan)"""
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        
+        # Accounts jadvali
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id SERIAL PRIMARY KEY,
@@ -27,6 +31,8 @@ def create_tables():
                 password TEXT NOT NULL
             )
         """)
+        
+        # Users jadvali (SERIAL ishlatilgan - id kiritish shart emas)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -35,6 +41,8 @@ def create_tables():
                 account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE
             )
         """)
+        
+        # Expenses jadvali
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id SERIAL PRIMARY KEY,
@@ -44,14 +52,15 @@ def create_tables():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
         conn.commit()
         conn.close()
+        print("Jadvallar muvaffaqiyatli tekshirildi/yaratildi.")
     except Exception as e:
         print(f"Bazada xato: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Dastur yoqilganda bazani tayyorlaydi
     create_tables()
     yield
 
@@ -66,26 +75,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API Routerlarni ulash
-app.include_router(auth_router)
-app.include_router(users_router)
-app.include_router(expenses.router)
+# ✅ API Routerlarni ulash
+app.include_router(auth_router)  # Login/Register (/auth/login)
+app.include_router(auth_methods_router) # ✅ YANGI: Refresh endpointi (/auth/refresh)
+app.include_router(users_router) # Userlar bilan ishlash
+app.include_router(expenses.router) # Xarajatlar
 
-# ✅ Static fayllarni ulash (CSS/JS ishlashi uchun)
+# Static fayllarni ulash
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# ✅ Asosiy sahifa (Login/Frontend)
+# Asosiy sahifa
 @app.get("/")
 async def home():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     
-    # Agar topilmasa, xatoni tushuntirish
     return {
         "status": "error",
         "message": "index.html topilmadi",
-        "debug_path": index_path,
-        "current_files": os.listdir(BASE_DIR) if os.path.exists(BASE_DIR) else "N/A"
+        "debug_path": index_path
     }
