@@ -1,12 +1,18 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles 
-from fastapi.responses import FileResponse 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import os
+
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
+
+# ✅ Fayl joylashgan papkani aniq topamiz
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "app", "static")
+
 
 def create_tables():
     conn = get_connection()
@@ -21,7 +27,7 @@ def create_tables():
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY, 
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE
@@ -39,10 +45,12 @@ def create_tables():
     conn.commit()
     conn.close()
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
     yield
+
 
 app = FastAPI(title="PDIS API", lifespan=lifespan)
 
@@ -58,12 +66,10 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# ✅ MUHIM: Static fayllarni ulash
-# Agar static papkasi 'app' ichida bo'lsa:
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# ✅ Mutlaq yo'l bilan static
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 @app.get("/")
 async def home():
-    # Eski return {"message": ...} qatorini O'CHIRDIK.
-    # Endi u faqat index.html faylini yuboradi.
-    return FileResponse("app/static/index.html")
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
