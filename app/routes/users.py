@@ -78,10 +78,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             raise HTTPException(status_code=400, detail="Foydalanuvchi topilmadi")
         if not verify(form_data.password, account[3]):
             raise HTTPException(status_code=400, detail="Parol noto'g'ri")
-
         access_token = create_access_token({"user_id": account[0]})
         refresh_token = create_refresh_token({"user_id": account[0]})
-
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -95,27 +93,18 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         conn.close()
 
 
-# ✅ REFRESH TOKEN ENDPOINT
 @auth_router.post("/refresh")
 def refresh_token(data: RefreshRequest):
     payload = decode_token(data.refresh_token)
-
     if not payload:
         raise HTTPException(status_code=401, detail="Refresh token noto'g'ri")
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Refresh token kerak")
-
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
-
-    # Yangi access token yaratish
     new_access_token = create_access_token({"user_id": user_id})
-
-    return {
-        "access_token": new_access_token,
-        "token_type": "bearer"
-    }
+    return {"access_token": new_access_token, "token_type": "bearer"}
 
 
 # ==================== USERS ====================
@@ -148,7 +137,8 @@ def get_users(account_id: int = Depends(get_current_account_id)):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, email FROM users WHERE account_id = %s",
+            # ✅ ASC — eng eskisi tepada, yangi qo'shilgan oxirida
+            "SELECT id, name, email FROM users WHERE account_id = %s ORDER BY id ASC",
             (account_id,)
         )
         rows = cursor.fetchall()
@@ -173,7 +163,7 @@ def delete_user(user_id: int, account_id: int = Depends(get_current_account_id))
             (user_id, account_id)
         )
         conn.commit()
-        return {"message": f"O'chirildi"}
+        return {"message": "O'chirildi"}
     except HTTPException:
         raise
     except Exception as e:

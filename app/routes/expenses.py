@@ -49,7 +49,8 @@ def get_expenses(account_id: int = Depends(get_current_account_id)):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, category, amount, created_at FROM expenses WHERE account_id = %s ORDER BY created_at DESC",
+            # ✅ ASC — eng eskisi tepada, yangi qo'shilgan oxirida
+            "SELECT id, category, amount, created_at FROM expenses WHERE account_id = %s ORDER BY created_at ASC",
             (account_id,)
         )
         rows = cursor.fetchall()
