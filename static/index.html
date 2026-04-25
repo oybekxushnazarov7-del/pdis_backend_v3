@@ -110,6 +110,39 @@
       font-size: 13px; margin-bottom: 16px; display: none;
     }
     .dashboard-page { flex-direction: row; }
+    .mobile-menu-btn {
+      display: none;
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 1200;
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .mobile-menu-btn span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+    }
+    .mobile-sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1090;
+    }
     .sidebar {
       width: 260px; min-height: 100vh;
       background: var(--surface);
@@ -241,6 +274,27 @@
     .toast.success { border-color: rgba(67,233,123,0.4); color: var(--green); }
     .toast.error   { border-color: rgba(255,101,132,0.4); color: var(--accent2); }
     .amount { color: var(--green); font-weight: 600; }
+    @media (max-width: 900px) {
+      .mobile-menu-btn { display: flex; }
+      .mobile-sidebar-overlay.show { display: block; }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: min(82vw, 300px);
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .main-content {
+        width: 100%;
+        padding: 76px 16px 24px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -294,7 +348,11 @@
 
 <!-- DASHBOARD -->
 <div class="page dashboard-page" id="page-dashboard">
-  <div class="sidebar">
+  <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Menyuni ochish">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="mobile-sidebar-overlay" id="mobile-sidebar-overlay" onclick="closeSidebar()"></div>
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-logo">PDIS</div>
     <div class="sidebar-user" id="sidebar-email">user@email.com</div>
     <nav>
@@ -427,9 +485,26 @@
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('section-' + name).classList.add('active');
     document.getElementById('nav-' + name).classList.add('active');
+    closeSidebar();
     if (name === 'users') loadUsers();
     if (name === 'expenses') loadExpenses();
     if (name === 'home') loadStats();
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-sidebar-overlay');
+    const isOpen = sidebar.classList.toggle('open');
+    overlay.classList.toggle('show', isOpen);
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+  }
+
+  function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-sidebar-overlay');
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+    document.body.style.overflow = '';
   }
 
   function showToast(msg, type = 'success') {
@@ -673,6 +748,11 @@
       if (document.getElementById('page-login').classList.contains('active')) doLogin();
       if (document.getElementById('page-register').classList.contains('active')) doRegister();
     }
+    if (e.key === 'Escape') closeSidebar();
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) closeSidebar();
   });
 </script>
 </body>
