@@ -226,6 +226,7 @@
     .btn-delete:hover { background: rgba(255,101,132,0.2); }
     .empty-state { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .num-cell { color: var(--muted); font-size: 12px; }
     .toast {
       position: fixed; bottom: 24px; right: 24px;
       background: var(--surface2);
@@ -438,12 +439,10 @@
     setTimeout(() => t.classList.remove('show'), 3000);
   }
 
-  // ✅ REFRESH TOKEN LOGIC
   async function authFetch(url, options = {}) {
     options.headers = options.headers || {};
     options.headers['Authorization'] = 'Bearer ' + accessToken;
     let res = await fetch(API + url, options);
-
     if (res.status === 401 && refreshToken) {
       const refreshRes = await fetch(API + '/auth/refresh', {
         method: 'POST',
@@ -574,8 +573,9 @@
         return;
       }
       el.innerHTML = `<table class="data-table">
-        <thead><tr><th>Ism</th><th>Email</th><th>Amal</th></tr></thead>
-        <tbody>${data.map(u => `<tr>
+        <thead><tr><th>#</th><th>Ism</th><th>Email</th><th>Amal</th></tr></thead>
+        <tbody>${data.map((u, i) => `<tr>
+          <td class="num-cell">${i + 1}</td>
           <td>${u.name}</td>
           <td>${u.email}</td>
           <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 O'chirish</button></td>
@@ -626,8 +626,9 @@
         return;
       }
       el.innerHTML = `<table class="data-table">
-        <thead><tr><th>Kategoriya</th><th>Miqdor</th><th>Sana</th><th>Amal</th></tr></thead>
-        <tbody>${data.map(e => `<tr>
+        <thead><tr><th>#</th><th>Kategoriya</th><th>Miqdor</th><th>Sana</th><th>Amal</th></tr></thead>
+        <tbody>${data.map((e, i) => `<tr>
+          <td class="num-cell">${i + 1}</td>
           <td>${e.category}</td>
           <td class="amount">${e.amount.toLocaleString()} so'm</td>
           <td style="color:var(--muted);font-size:12px">${new Date(e.created_at).toLocaleDateString('uz-UZ')}</td>
