@@ -56,6 +56,7 @@
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
       margin-bottom: 8px;
     }
     .auth-subtitle { color: var(--muted); font-size: 14px; margin-bottom: 36px; }
@@ -122,6 +123,7 @@
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
       margin-bottom: 8px; padding: 0 12px;
     }
     .sidebar-user { font-size: 12px; color: var(--muted); padding: 0 12px; margin-bottom: 32px; }
@@ -224,11 +226,6 @@
     .btn-delete:hover { background: rgba(255,101,132,0.2); }
     .empty-state { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .badge {
-      display: inline-block; padding: 4px 10px;
-      border-radius: 20px; font-size: 11px; font-weight: 600;
-      background: rgba(108,99,255,0.15); color: var(--accent);
-    }
     .toast {
       position: fixed; bottom: 24px; right: 24px;
       background: var(--surface2);
@@ -357,10 +354,6 @@
         <div class="card-title">➕ Yangi foydalanuvchi</div>
         <div class="inline-form">
           <div class="form-group">
-            <label>ID</label>
-            <input type="number" id="user-id" placeholder="1"/>
-          </div>
-          <div class="form-group">
             <label>Ism</label>
             <input type="text" id="user-name" placeholder="Ism Familiya"/>
           </div>
@@ -387,15 +380,11 @@
         <div class="card-title">➕ Yangi xarajat</div>
         <div class="inline-form">
           <div class="form-group">
-            <label>ID</label>
-            <input type="number" id="exp-id" placeholder="1"/>
-          </div>
-          <div class="form-group">
             <label>Kategoriya</label>
             <input type="text" id="exp-category" placeholder="Oziq-ovqat"/>
           </div>
           <div class="form-group">
-            <label>Miqdor</label>
+            <label>Miqdor (so'm)</label>
             <input type="number" id="exp-amount" placeholder="50000"/>
           </div>
           <button class="btn-add" onclick="addExpense()">+ Qo'shish</button>
@@ -412,12 +401,13 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const API = '';  // bo'sh — same origin (backend o'zi serve qiladi)
-  let token = localStorage.getItem('pdis_token') || '';
+  const API = '';
+  let accessToken = localStorage.getItem('pdis_access') || '';
+  let refreshToken = localStorage.getItem('pdis_refresh') || '';
   let userEmail = localStorage.getItem('pdis_email') || '';
 
   window.onload = () => {
-    if (token) {
+    if (accessToken) {
       showPage('page-dashboard');
       document.getElementById('sidebar-email').textContent = userEmail;
       loadStats();
@@ -446,6 +436,32 @@
     t.textContent = msg;
     t.className = 'toast ' + type + ' show';
     setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // ✅ REFRESH TOKEN LOGIC
+  async function authFetch(url, options = {}) {
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = 'Bearer ' + accessToken;
+    let res = await fetch(API + url, options);
+
+    if (res.status === 401 && refreshToken) {
+      const refreshRes = await fetch(API + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        accessToken = data.access_token;
+        localStorage.setItem('pdis_access', accessToken);
+        options.headers['Authorization'] = 'Bearer ' + accessToken;
+        res = await fetch(API + url, options);
+      } else {
+        doLogout();
+        return null;
+      }
+    }
+    return res;
   }
 
   async function doRegister() {
@@ -501,9 +517,11 @@
       });
       const data = await res.json();
       if (res.ok) {
-        token = data.access_token;
+        accessToken = data.access_token;
+        refreshToken = data.refresh_token;
         userEmail = email;
-        localStorage.setItem('pdis_token', token);
+        localStorage.setItem('pdis_access', accessToken);
+        localStorage.setItem('pdis_refresh', refreshToken);
         localStorage.setItem('pdis_email', email);
         document.getElementById('sidebar-email').textContent = email;
         showPage('page-dashboard');
@@ -520,8 +538,9 @@
   }
 
   function doLogout() {
-    token = ''; userEmail = '';
-    localStorage.removeItem('pdis_token');
+    accessToken = ''; refreshToken = ''; userEmail = '';
+    localStorage.removeItem('pdis_access');
+    localStorage.removeItem('pdis_refresh');
     localStorage.removeItem('pdis_email');
     showPage('page-login');
     showToast('Chiqildi!');
@@ -530,9 +549,10 @@
   async function loadStats() {
     try {
       const [uRes, eRes] = await Promise.all([
-        fetch(API + '/users/', { headers: { Authorization: 'Bearer ' + token } }),
-        fetch(API + '/expenses/', { headers: { Authorization: 'Bearer ' + token } })
+        authFetch('/users/'),
+        authFetch('/expenses/')
       ]);
+      if (!uRes || !eRes) return;
       const users = await uRes.json();
       const exps = await eRes.json();
       document.getElementById('stat-users').textContent = Array.isArray(users) ? users.length : 0;
@@ -546,37 +566,37 @@
     const el = document.getElementById('users-list');
     el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
     try {
-      const res = await fetch(API + '/users/', { headers: { Authorization: 'Bearer ' + token } });
+      const res = await authFetch('/users/');
+      if (!res) return;
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>Hali foydalanuvchi qo\'shilmagan</div>';
         return;
       }
       el.innerHTML = `<table class="data-table">
-        <thead><tr><th>ID</th><th>Ism</th><th>Email</th><th>Amal</th></tr></thead>
+        <thead><tr><th>Ism</th><th>Email</th><th>Amal</th></tr></thead>
         <tbody>${data.map(u => `<tr>
-          <td><span class="badge">#${u.id}</span></td>
-          <td>${u.name}</td><td>${u.email}</td>
+          <td>${u.name}</td>
+          <td>${u.email}</td>
           <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 O'chirish</button></td>
         </tr>`).join('')}</tbody></table>`;
     } catch(e) { el.innerHTML = '<div class="empty-state">Xato yuz berdi</div>'; }
   }
 
   async function addUser() {
-    const id = parseInt(document.getElementById('user-id').value);
     const name = document.getElementById('user-name').value.trim();
     const email = document.getElementById('user-email').value.trim();
-    if (!id || !name || !email) { showToast("Barcha maydonlarni to'ldiring!", 'error'); return; }
+    if (!name || !email) { showToast("Barcha maydonlarni to'ldiring!", 'error'); return; }
     try {
-      const res = await fetch(API + '/users/', {
+      const res = await authFetch('/users/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ id, name, email })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
       });
+      if (!res) return;
       const data = await res.json();
       if (res.ok) {
         showToast('✅ Qo\'shildi!');
-        document.getElementById('user-id').value = '';
         document.getElementById('user-name').value = '';
         document.getElementById('user-email').value = '';
         loadUsers(); loadStats();
@@ -585,12 +605,10 @@
   }
 
   async function deleteUser(id) {
-    if (!confirm(`ID ${id} o'chirasizmi?`)) return;
+    if (!confirm('O\'chirasizmi?')) return;
     try {
-      const res = await fetch(API + '/users/' + id, {
-        method: 'DELETE',
-        headers: { Authorization: 'Bearer ' + token }
-      });
+      const res = await authFetch('/users/' + id, { method: 'DELETE' });
+      if (!res) return;
       if (res.ok) { showToast('✅ O\'chirildi!'); loadUsers(); loadStats(); }
       else { const d = await res.json(); showToast(d.detail || 'Xato!', 'error'); }
     } catch(e) { showToast('Xato!', 'error'); }
@@ -600,16 +618,16 @@
     const el = document.getElementById('expenses-list');
     el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
     try {
-      const res = await fetch(API + '/expenses/', { headers: { Authorization: 'Bearer ' + token } });
+      const res = await authFetch('/expenses/');
+      if (!res) return;
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>Hali xarajat qo\'shilmagan</div>';
         return;
       }
       el.innerHTML = `<table class="data-table">
-        <thead><tr><th>ID</th><th>Kategoriya</th><th>Miqdor</th><th>Sana</th><th>Amal</th></tr></thead>
+        <thead><tr><th>Kategoriya</th><th>Miqdor</th><th>Sana</th><th>Amal</th></tr></thead>
         <tbody>${data.map(e => `<tr>
-          <td><span class="badge">#${e.id}</span></td>
           <td>${e.category}</td>
           <td class="amount">${e.amount.toLocaleString()} so'm</td>
           <td style="color:var(--muted);font-size:12px">${new Date(e.created_at).toLocaleDateString('uz-UZ')}</td>
@@ -619,20 +637,19 @@
   }
 
   async function addExpense() {
-    const id = parseInt(document.getElementById('exp-id').value);
     const category = document.getElementById('exp-category').value.trim();
     const amount = parseFloat(document.getElementById('exp-amount').value);
-    if (!id || !category || !amount) { showToast("Barcha maydonlarni to'ldiring!", 'error'); return; }
+    if (!category || !amount) { showToast("Barcha maydonlarni to'ldiring!", 'error'); return; }
     try {
-      const res = await fetch(API + '/expenses/', {
+      const res = await authFetch('/expenses/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ id, category, amount })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, amount })
       });
+      if (!res) return;
       const data = await res.json();
       if (res.ok) {
         showToast('✅ Qo\'shildi!');
-        document.getElementById('exp-id').value = '';
         document.getElementById('exp-category').value = '';
         document.getElementById('exp-amount').value = '';
         loadExpenses(); loadStats();
@@ -641,12 +658,10 @@
   }
 
   async function deleteExpense(id) {
-    if (!confirm(`ID ${id} o'chirasizmi?`)) return;
+    if (!confirm('O\'chirasizmi?')) return;
     try {
-      const res = await fetch(API + '/expenses/' + id, {
-        method: 'DELETE',
-        headers: { Authorization: 'Bearer ' + token }
-      });
+      const res = await authFetch('/expenses/' + id, { method: 'DELETE' });
+      if (!res) return;
       if (res.ok) { showToast('✅ O\'chirildi!'); loadExpenses(); loadStats(); }
       else { const d = await res.json(); showToast(d.detail || 'Xato!', 'error'); }
     } catch(e) { showToast('Xato!', 'error'); }

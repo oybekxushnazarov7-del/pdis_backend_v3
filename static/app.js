@@ -1,20 +1,20 @@
-const API_URL = "https://pdis-backend-v3.onrender.com"; // V3 ga o'zgargan bo'lsa tekshiring
+const API_URL = "https://pdis-backend-v3.onrender.com";
 
-// ✅ 1. Aqlli Fetch funksiyasi (Token o'lsa avtomatik yangilaydi)
-async function authorizedFetch(url, options = {}) {
-    let token = localStorage.getItem('access_token');
+// ✅ 1. Aqlli Fetch (Token o'lsa avtomatik yangilaydi)
+async function authFetch(url, options = {}) {
+    let accessToken = localStorage.getItem('pdis_token');
     
     // Headerlarni tayyorlash
     options.headers = {
         ...options.headers,
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${accessToken}`
     };
 
-    let response = await fetch(url, options);
+    let response = await fetch(API_URL + url, options);
 
     // Agar token muddati tugagan bo'lsa (401 xatosi)
     if (response.status === 401) {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const refreshToken = localStorage.getItem('pdis_refresh');
         
         if (refreshToken) {
             // Serverdan yangi access token so'raymiz
@@ -25,28 +25,29 @@ async function authorizedFetch(url, options = {}) {
             });
 
             if (refreshRes.ok) {
-                const refreshData = await refreshRes.json();
-                localStorage.setItem('access_token', refreshData.access_token);
+                const data = await refreshRes.json();
+                localStorage.setItem('pdis_token', data.access_token);
                 
                 // Eski so'rovni yangi token bilan qayta urinib ko'ramiz
-                options.headers['Authorization'] = `Bearer ${refreshData.access_token}`;
-                return await fetch(url, options);
-            } else {
-                // Refresh ham o'lgan bo'lsa - logout
-                logout();
+                options.headers['Authorization'] = `Bearer ${data.access_token}`;
+                return await fetch(API_URL + url, options);
             }
-        } else {
-            logout();
         }
+        // Agar refresh ham o'tmasa yoki bo'lmasa - logout
+        doLogout();
     }
-
     return response;
 }
 
 // ✅ 2. Login funksiyasi
-async function login() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) {
+        showToast("Email va parolni kiriting!", 'error');
+        return;
+    }
 
     const formData = new URLSearchParams();
     formData.append('username', email);
@@ -62,55 +63,83 @@ async function login() {
         const data = await response.json();
 
         if (response.ok) {
-            // ✅ Ikkala tokenni ham saqlaymiz
-            localStorage.setItem('access_token', data.access_token);
-            localStorage.setItem('refresh_token', data.refresh_token);
-            localStorage.setItem('user_email', email); // Dashboardda ko'rsatish uchun
+            localStorage.setItem('pdis_token', data.access_token);
+            localStorage.setItem('pdis_refresh', data.refresh_token);
+            localStorage.setItem('pdis_email', email);
             
-            showDashboard();
+            showToast('Xush kelibsiz! 👋');
+            setTimeout(() => location.reload(), 1000); // Sahifani yangilab dashboardga o'tamiz
         } else {
-            alert("Xato: " + (data.detail || "Kirishda xatolik"));
+            showToast(data.detail || "Kirishda xatolik", 'error');
         }
     } catch (error) {
-        console.error("Login xatosi:", error);
-        alert("Server bilan aloqa yo'q");
+        showToast("Server bilan aloqa yo'q", 'error');
     }
 }
 
-// ✅ 3. Dashboardni ko'rsatish
-async function showDashboard() {
-    const authCard = document.getElementById('auth-card');
-    const dataSection = document.getElementById('data-section');
-    
-    if(authCard) authCard.style.display = 'none';
-    if(dataSection) dataSection.style.display = 'block';
+// ✅ 3. Foydalanuvchi qo'shish (ID-siz!)
+async function addUser() {
+    const name = document.getElementById('user-name').value.trim();
+    const email = document.getElementById('user-email').value.trim();
 
-    // Foydalanuvchilarni olish (authorizedFetch orqali)
-    const response = await authorizedFetch(`${API_URL}/users/`);
-    
-    if (response.ok) {
-        const users = await response.json();
-        const list = document.getElementById('user-list');
-        if (list) {
-            list.innerHTML = users.map(u => `
-                <li class="user-item">
-                    <span>${u.name}</span> 
-                    <small>${u.email}</small>
-                </li>
-            `).join('');
+    if (!name || !email) {
+        showToast("Ism va emailni kiriting!", 'error');
+        return;
+    }
+
+    try {
+        const response = await authFetch('/users/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email }) // Faqat name va email!
+        });
+
+        if (response.ok) {
+            showToast('✅ Foydalanuvchi qo\'shildi!');
+            document.getElementById('user-name').value = '';
+            document.getElementById('user-email').value = '';
+            loadUsers(); // Ro'yxatni yangilash
+            loadStats(); // Dashboard raqamlarini yangilash
+        } else {
+            const err = await response.json();
+            showToast(err.detail || "Xato yuz berdi", 'error');
         }
+    } catch (e) {
+        showToast("Xato!", 'error');
     }
 }
 
-// ✅ 4. Logout funksiyasi
-function logout() {
+// ✅ 4. Xarajat qo'shish (ID-siz!)
+async function addExpense() {
+    const category = document.getElementById('exp-category').value.trim();
+    const amount = parseFloat(document.getElementById('exp-amount').value);
+
+    if (!category || !amount) {
+        showToast("Kategoriya va miqdorni kiriting!", 'error');
+        return;
+    }
+
+    try {
+        const response = await authFetch('/expenses/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category, amount }) // Faqat category va amount!
+        });
+
+        if (response.ok) {
+            showToast('✅ Xarajat qo\'shildi!');
+            document.getElementById('exp-category').value = '';
+            document.getElementById('exp-amount').value = '';
+            loadExpenses();
+            loadStats();
+        }
+    } catch (e) {
+        showToast("Xato!", 'error');
+    }
+}
+
+// ✅ 5. Logout
+function doLogout() {
     localStorage.clear();
-    window.location.reload();
-}
-
-// Sahifa yuklanganda holatni tekshirish
-window.onload = () => {
-    if (localStorage.getItem('access_token')) {
-        showDashboard();
-    }
-};
+    location.reload();
+}1

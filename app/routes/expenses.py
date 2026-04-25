@@ -8,7 +8,6 @@ router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 
 class ExpenseCreate(BaseModel):
-    id: int
     category: str
     amount: float
 
@@ -17,29 +16,26 @@ def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Token noto'g'ri yoki muddati o'tgan")
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=401, detail="Access token kerak")
     account_id = payload.get("user_id")
     if account_id is None:
         raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
     return account_id
 
 
-# 1️⃣ POST
 @router.post("/")
 def add_expense(expense: ExpenseCreate, account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM expenses WHERE id = %s", (expense.id,))
-        if cursor.fetchone():
-            raise HTTPException(status_code=400, detail=f"ID {expense.id} allaqachon band")
         cursor.execute(
-            "INSERT INTO expenses (id, account_id, category, amount) VALUES (%s, %s, %s, %s)",
-            (expense.id, account_id, expense.category, expense.amount)
+            "INSERT INTO expenses (account_id, category, amount) VALUES (%s, %s, %s) RETURNING id",
+            (account_id, expense.category, expense.amount)
         )
+        new_id = cursor.fetchone()[0]
         conn.commit()
-        return {"message": "Xarajat qo'shildi", "id": expense.id, "category": expense.category, "amount": expense.amount}
-    except HTTPException:
-        raise
+        return {"message": "Xarajat qo'shildi", "id": new_id, "category": expense.category, "amount": expense.amount}
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
@@ -47,14 +43,13 @@ def add_expense(expense: ExpenseCreate, account_id: int = Depends(get_current_ac
         conn.close()
 
 
-# 2️⃣ GET
 @router.get("/")
 def get_expenses(account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, category, amount, created_at FROM expenses WHERE account_id = %s",
+            "SELECT id, category, amount, created_at FROM expenses WHERE account_id = %s ORDER BY created_at DESC",
             (account_id,)
         )
         rows = cursor.fetchall()
@@ -65,7 +60,6 @@ def get_expenses(account_id: int = Depends(get_current_account_id)):
         conn.close()
 
 
-# 3️⃣ DELETE
 @router.delete("/{expense_id}")
 def delete_expense(expense_id: int, account_id: int = Depends(get_current_account_id)):
     conn = get_connection()
@@ -77,8 +71,8 @@ def delete_expense(expense_id: int, account_id: int = Depends(get_current_accoun
         )
         conn.commit()
         if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail=f"ID {expense_id} topilmadi yoki sizga tegishli emas")
-        return {"message": f"ID {expense_id} xarajat o'chirildi"}
+            raise HTTPException(status_code=404, detail="Topilmadi yoki sizga tegishli emas")
+        return {"message": "O'chirildi"}
     except HTTPException:
         raise
     except Exception as e:
