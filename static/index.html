@@ -111,10 +111,10 @@
     }
     .dashboard-page { flex-direction: row; }
     .mobile-menu-btn {
-      display: none;
+      display: flex;
       position: fixed;
       top: 14px;
-      right: 14px;
+      left: 14px;
       z-index: 1200;
       width: 44px;
       height: 44px;
@@ -149,6 +149,7 @@
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column;
       padding: 32px 20px; flex-shrink: 0;
+      transition: transform 0.25s ease;
     }
     .sidebar-logo {
       font-family: 'Syne', sans-serif;
@@ -185,7 +186,13 @@
       background: rgba(255,101,132,0.1);
       border-color: rgba(255,101,132,0.2);
     }
-    .main-content { flex: 1; padding: 40px; overflow-y: auto; }
+    .main-content { flex: 1; padding: 76px 40px 40px; overflow-y: auto; }
+    .dashboard-page.sidebar-collapsed .sidebar {
+      transform: translateX(-100%);
+    }
+    .dashboard-page.sidebar-collapsed .main-content {
+      width: 100%;
+    }
     .content-section { display: none; }
     .content-section.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn {
@@ -274,8 +281,125 @@
     .toast.success { border-color: rgba(67,233,123,0.4); color: var(--green); }
     .toast.error   { border-color: rgba(255,101,132,0.4); color: var(--accent2); }
     .amount { color: var(--green); font-weight: 600; }
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .filter-chip {
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .filter-chip.active {
+      color: var(--accent);
+      border-color: rgba(108,99,255,0.35);
+      background: rgba(108,99,255,0.12);
+    }
+    .mobile-bottom-nav {
+      display: none;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1200;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .mobile-nav-item {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 10px 6px;
+      cursor: pointer;
+    }
+    .mobile-nav-item.active {
+      background: rgba(108,99,255,0.15);
+      color: var(--accent);
+      border-color: rgba(108,99,255,0.3);
+    }
+    .quick-add-btn {
+      display: none;
+      position: fixed;
+      right: 16px;
+      bottom: 84px;
+      z-index: 1210;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #9b59b6);
+      color: #fff;
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(108,99,255,0.4);
+    }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1300;
+      background: rgba(0,0,0,0.55);
+      align-items: flex-end;
+      justify-content: center;
+      padding: 14px;
+    }
+    .modal-overlay.show {
+      display: flex;
+    }
+    .quick-modal {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+    }
+    .quick-modal-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+    .quick-modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .btn-ghost {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-save {
+      flex: 1;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #9b59b6);
+      color: #fff;
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
     @media (max-width: 900px) {
-      .mobile-menu-btn { display: flex; }
       .mobile-sidebar-overlay.show { display: block; }
       .sidebar {
         position: fixed;
@@ -292,8 +416,10 @@
       }
       .main-content {
         width: 100%;
-        padding: 76px 16px 24px;
+        padding: 76px 16px 94px;
       }
+      .mobile-bottom-nav { display: grid; }
+      .quick-add-btn { display: block; }
     }
   </style>
 </head>
@@ -435,6 +561,12 @@
         <h1>💸 Xarajatlar</h1>
         <p>Xarajatlaringizni kuzating</p>
       </div>
+      <div class="filter-row">
+        <button class="filter-chip active" id="filter-all" onclick="setExpenseFilter('all')">Barchasi</button>
+        <button class="filter-chip" id="filter-today" onclick="setExpenseFilter('today')">Bugun</button>
+        <button class="filter-chip" id="filter-week" onclick="setExpenseFilter('week')">Hafta</button>
+        <button class="filter-chip" id="filter-month" onclick="setExpenseFilter('month')">Oy</button>
+      </div>
       <div class="card">
         <div class="card-title">➕ Yangi xarajat</div>
         <div class="inline-form">
@@ -457,6 +589,32 @@
   </div>
 </div>
 
+<div class="mobile-bottom-nav" id="mobile-bottom-nav">
+  <button class="mobile-nav-item active" id="mnav-home" onclick="showSection('home')">🏠 Bosh sahifa</button>
+  <button class="mobile-nav-item" id="mnav-users" onclick="showSection('users')">👥 Users</button>
+  <button class="mobile-nav-item" id="mnav-expenses" onclick="showSection('expenses')">💸 Xarajat</button>
+</div>
+
+<button class="quick-add-btn" id="quick-add-btn" onclick="openQuickAdd()" aria-label="Tez xarajat qo'shish">+</button>
+
+<div class="modal-overlay" id="quick-add-modal" onclick="closeQuickAdd(event)">
+  <div class="quick-modal" onclick="event.stopPropagation()">
+    <div class="quick-modal-title">⚡ Tez xarajat qo'shish</div>
+    <div class="form-group">
+      <label>Kategoriya</label>
+      <input type="text" id="quick-category" placeholder="Masalan: Transport"/>
+    </div>
+    <div class="form-group">
+      <label>Miqdor (so'm)</label>
+      <input type="number" id="quick-amount" placeholder="50000"/>
+    </div>
+    <div class="quick-modal-actions">
+      <button class="btn-ghost" onclick="closeQuickAdd()">Bekor qilish</button>
+      <button class="btn-save" onclick="saveQuickExpense()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -464,6 +622,8 @@
   let accessToken = localStorage.getItem('pdis_access') || '';
   let refreshToken = localStorage.getItem('pdis_refresh') || '';
   let userEmail = localStorage.getItem('pdis_email') || '';
+  let currentSection = 'home';
+  let expenseFilter = 'all';
 
   window.onload = () => {
     if (accessToken) {
@@ -478,32 +638,55 @@
   function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    const isDashboard = id === 'page-dashboard';
+    const bottomNav = document.getElementById('mobile-bottom-nav');
+    const quickBtn = document.getElementById('quick-add-btn');
+    if (bottomNav) bottomNav.style.display = isDashboard && window.innerWidth <= 900 ? 'grid' : 'none';
+    if (quickBtn) quickBtn.style.display = isDashboard && window.innerWidth <= 900 ? 'block' : 'none';
   }
 
   function showSection(name) {
+    currentSection = name;
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('section-' + name).classList.add('active');
-    document.getElementById('nav-' + name).classList.add('active');
+    setActiveNav(name);
     closeSidebar();
     if (name === 'users') loadUsers();
     if (name === 'expenses') loadExpenses();
     if (name === 'home') loadStats();
   }
 
+  function setActiveNav(name) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.mobile-nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('nav-' + name).classList.add('active');
+    const mobileItem = document.getElementById('mnav-' + name);
+    if (mobileItem) mobileItem.classList.add('active');
+  }
+
   function toggleSidebar() {
+    const dashboard = document.getElementById('page-dashboard');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('mobile-sidebar-overlay');
-    const isOpen = sidebar.classList.toggle('open');
-    overlay.classList.toggle('show', isOpen);
-    document.body.style.overflow = isOpen ? 'hidden' : '';
+    const isMobile = window.innerWidth <= 900;
+
+    if (isMobile) {
+      const isOpen = sidebar.classList.toggle('open');
+      overlay.classList.toggle('show', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      return;
+    }
+
+    dashboard.classList.toggle('sidebar-collapsed');
   }
 
   function closeSidebar() {
+    const dashboard = document.getElementById('page-dashboard');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('mobile-sidebar-overlay');
     sidebar.classList.remove('open');
     overlay.classList.remove('show');
+    dashboard.classList.remove('sidebar-collapsed');
     document.body.style.overflow = '';
   }
 
@@ -696,13 +879,15 @@
       const res = await authFetch('/expenses/');
       if (!res) return;
       const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) {
+      const source = Array.isArray(data) ? data : [];
+      const filtered = source.filter(matchesExpenseFilter);
+      if (filtered.length === 0) {
         el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>Hali xarajat qo\'shilmagan</div>';
         return;
       }
       el.innerHTML = `<table class="data-table">
         <thead><tr><th>#</th><th>Kategoriya</th><th>Miqdor</th><th>Sana</th><th>Amal</th></tr></thead>
-        <tbody>${data.map((e, i) => `<tr>
+        <tbody>${filtered.map((e, i) => `<tr>
           <td class="num-cell">${i + 1}</td>
           <td>${e.category}</td>
           <td class="amount">${e.amount.toLocaleString()} so'm</td>
@@ -712,9 +897,39 @@
     } catch(e) { el.innerHTML = '<div class="empty-state">Xato yuz berdi</div>'; }
   }
 
-  async function addExpense() {
-    const category = document.getElementById('exp-category').value.trim();
-    const amount = parseFloat(document.getElementById('exp-amount').value);
+  function setExpenseFilter(type) {
+    expenseFilter = type;
+    document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+    const selected = document.getElementById('filter-' + type);
+    if (selected) selected.classList.add('active');
+    loadExpenses();
+  }
+
+  function matchesExpenseFilter(expense) {
+    if (expenseFilter === 'all') return true;
+    const created = new Date(expense.created_at);
+    const now = new Date();
+    if (expenseFilter === 'today') {
+      return created.toDateString() === now.toDateString();
+    }
+    if (expenseFilter === 'week') {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 7);
+      return created >= start;
+    }
+    if (expenseFilter === 'month') {
+      return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+    }
+    return true;
+  }
+
+  async function addExpense(source = 'inline') {
+    const category = source === 'quick'
+      ? document.getElementById('quick-category').value.trim()
+      : document.getElementById('exp-category').value.trim();
+    const amount = source === 'quick'
+      ? parseFloat(document.getElementById('quick-amount').value)
+      : parseFloat(document.getElementById('exp-amount').value);
     if (!category || !amount) { showToast("Barcha maydonlarni to'ldiring!", 'error'); return; }
     try {
       const res = await authFetch('/expenses/', {
@@ -726,11 +941,36 @@
       const data = await res.json();
       if (res.ok) {
         showToast('✅ Qo\'shildi!');
-        document.getElementById('exp-category').value = '';
-        document.getElementById('exp-amount').value = '';
+        if (source === 'quick') {
+          document.getElementById('quick-category').value = '';
+          document.getElementById('quick-amount').value = '';
+          closeQuickAdd();
+          showSection('expenses');
+        } else {
+          document.getElementById('exp-category').value = '';
+          document.getElementById('exp-amount').value = '';
+        }
         loadExpenses(); loadStats();
       } else { showToast(data.detail || 'Xato!', 'error'); }
     } catch(e) { showToast('Xato!', 'error'); }
+  }
+
+  function openQuickAdd() {
+    if (!accessToken) return;
+    const modal = document.getElementById('quick-add-modal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeQuickAdd(event) {
+    if (event && event.target && event.target.id !== 'quick-add-modal') return;
+    const modal = document.getElementById('quick-add-modal');
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  function saveQuickExpense() {
+    addExpense('quick');
   }
 
   async function deleteExpense(id) {
@@ -749,10 +989,31 @@
       if (document.getElementById('page-register').classList.contains('active')) doRegister();
     }
     if (e.key === 'Escape') closeSidebar();
+    if (e.key === 'Escape') closeQuickAdd();
   });
 
   window.addEventListener('resize', () => {
-    if (window.innerWidth > 900) closeSidebar();
+    if (window.innerWidth > 900) {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      const bottomNav = document.getElementById('mobile-bottom-nav');
+      const quickBtn = document.getElementById('quick-add-btn');
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+      if (bottomNav) bottomNav.style.display = 'none';
+      if (quickBtn) quickBtn.style.display = 'none';
+      document.body.style.overflow = '';
+      return;
+    }
+
+    const dashboard = document.getElementById('page-dashboard');
+    dashboard.classList.remove('sidebar-collapsed');
+    if (document.getElementById('page-dashboard').classList.contains('active')) {
+      const bottomNav = document.getElementById('mobile-bottom-nav');
+      const quickBtn = document.getElementById('quick-add-btn');
+      if (bottomNav) bottomNav.style.display = 'grid';
+      if (quickBtn) quickBtn.style.display = 'block';
+    }
   });
 </script>
 </body>
