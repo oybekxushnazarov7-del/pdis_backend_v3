@@ -111,7 +111,7 @@
     }
     .dashboard-page { flex-direction: row; }
     .mobile-menu-btn {
-      display: flex;
+      display: none;
       position: fixed;
       top: 16px;
       left: 16px;
@@ -307,6 +307,7 @@
       background: rgba(108,99,255,0.12);
     }
     @media (max-width: 900px) {
+      .mobile-menu-btn { display: flex; }
       .mobile-sidebar-overlay.show { display: block; }
       .sidebar {
         position: fixed;
@@ -530,30 +531,20 @@
   }
 
   function toggleSidebar() {
-    const dashboard = document.getElementById('page-dashboard');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('mobile-sidebar-overlay');
-    const isMobile = window.innerWidth <= 900;
-
-    if (isMobile) {
-      const isOpen = sidebar.classList.toggle('open');
-      overlay.classList.toggle('show', isOpen);
-      document.body.classList.toggle('menu-open', isOpen);
-      document.body.style.overflow = isOpen ? 'hidden' : '';
-      return;
-    }
-
-    dashboard.classList.toggle('sidebar-collapsed');
+    const isOpen = sidebar.classList.toggle('open');
+    overlay.classList.toggle('show', isOpen);
+    document.body.classList.toggle('menu-open', isOpen);
+    document.body.style.overflow = isOpen ? 'hidden' : '';
   }
 
   function closeSidebar() {
-    const dashboard = document.getElementById('page-dashboard');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('mobile-sidebar-overlay');
     sidebar.classList.remove('open');
     overlay.classList.remove('show');
     document.body.classList.remove('menu-open');
-    dashboard.classList.remove('sidebar-collapsed');
     document.body.style.overflow = '';
   }
 
@@ -839,9 +830,6 @@
       document.body.style.overflow = '';
       return;
     }
-
-    const dashboard = document.getElementById('page-dashboard');
-    dashboard.classList.remove('sidebar-collapsed');
   });
 </script>
 </body>
