@@ -9,8 +9,6 @@ import os
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
-# ✅ YANGI: auth.py dagi router (refresh endpointi bor router)
-from app.auth import router as auth_methods_router 
 
 # Papka manzillarini aniqlash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -109,8 +107,7 @@ app.add_middleware(
 )
 
 # ✅ API Routerlarni ulash
-app.include_router(auth_router)  # Login/Register (/auth/login)
-app.include_router(auth_methods_router) # ✅ YANGI: Refresh endpointi (/auth/refresh)
+app.include_router(auth_router)  # Login/Register/Refresh
 app.include_router(users_router) # Userlar bilan ishlash
 app.include_router(expenses.router) # Xarajatlar
 
