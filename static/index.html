@@ -1115,17 +1115,24 @@
 
     async function loadStats() {
       try {
-        const [uRes, eRes] = await Promise.all([
+        const [uRes, eRes, budgetRes] = await Promise.all([
           authFetch('/users/'),
-          authFetch('/expenses/')
+          authFetch('/expenses/'),
+          authFetch(`/expenses/budget/${new Date().toISOString().slice(0, 7)}`)
         ]);
-        if (!uRes || !eRes) return;
+        if (!uRes || !eRes || !budgetRes) return;
         const users = await uRes.json();
         const exps = await eRes.json();
+        const budgetData = await budgetRes.json();
         document.getElementById('stat-users').textContent = Array.isArray(users) ? users.length : 0;
         document.getElementById('stat-expenses').textContent = Array.isArray(exps) ? exps.length : 0;
         const total = Array.isArray(exps) ? exps.reduce((s, e) => s + (e.amount || 0), 0) : 0;
         document.getElementById('stat-total').textContent = total.toLocaleString() + " so'm";
+        const budget = budgetData?.amount || 0;
+        const remaining = budget - total;
+        const budgetEl = document.getElementById('stat-budget');
+        budgetEl.textContent = (remaining).toLocaleString() + " so'm";
+        budgetEl.className = remaining < 0 ? 'stat-value pink' : 'stat-value green';
       } catch (e) { }
     }
 
@@ -1262,6 +1269,62 @@
         if (res.ok) { showToast('✅ O\'chirildi!'); loadExpenses(); loadStats(); }
         else { const d = await res.json(); showToast(d.detail || 'Xato!', 'error'); }
       } catch (e) { showToast('Xato!', 'error'); }
+    }
+
+    function parseMonthYear(value) {
+      const trimmed = value.trim();
+      if (/^\d{4}-\d{2}$/.test(trimmed)) return trimmed;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed.slice(0, 7);
+      return null;
+    }
+
+    async function setBudget() {
+      const month = parseMonthYear(document.getElementById('budget-month').value);
+      const amount = parseFloat(document.getElementById('budget-amount').value);
+      if (!month || isNaN(amount) || amount <= 0) {
+        showToast('Please enter a valid budget month and amount.', 'error');
+        return;
+      }
+      try {
+        const res = await authFetch('/expenses/budget', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ month_year: month, amount })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('✅ Budget saved');
+          loadStats();
+        } else {
+          showToast(data.detail || 'Error saving budget', 'error');
+        }
+      } catch (e) {
+        showToast('Server error saving budget', 'error');
+      }
+    }
+
+    async function exportExpenses() {
+      try {
+        const res = await authFetch('/expenses/export/csv');
+        if (!res) return;
+        if (!res.ok) {
+          const data = await res.json();
+          showToast(data.detail || 'Export failed', 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'expenses.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('✅ CSV downloaded');
+      } catch (e) {
+        showToast('Server error exporting CSV', 'error');
+      }
     }
 
     document.addEventListener('keydown', e => {

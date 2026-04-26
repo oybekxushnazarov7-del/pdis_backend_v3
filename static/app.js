@@ -470,6 +470,66 @@ async function deleteExpense(id) {
     }
 }
 
+function parseMonthYear(value) {
+    const trimmed = value.trim();
+    const monthOnly = /^\d{4}-\d{2}$/.test(trimmed);
+    const fullDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+    if (monthOnly) return trimmed;
+    if (fullDate) return trimmed.slice(0, 7);
+    return null;
+}
+
+async function setBudget() {
+    const monthValue = document.getElementById('budget-month').value.trim();
+    const amountValue = parseFloat(document.getElementById('budget-amount').value);
+    const monthYear = parseMonthYear(monthValue);
+    if (!monthYear || isNaN(amountValue) || amountValue <= 0) {
+        showToast('Please enter a valid month and budget amount.', 'error');
+        return;
+    }
+    try {
+        const res = await authFetch('/expenses/budget', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month_year: monthYear, amount: amountValue })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (res.ok) {
+            showToast('✅ Budget saved successfully');
+            loadStats();
+        } else {
+            showToast(data.detail || 'Error saving budget', 'error');
+        }
+    } catch (error) {
+        showToast('Error saving budget', 'error');
+    }
+}
+
+async function exportExpenses() {
+    try {
+        const res = await authFetch('/expenses/export/csv');
+        if (!res) return;
+        if (!res.ok) {
+            const data = await res.json();
+            showToast(data.detail || 'Export failed', 'error');
+            return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'expenses.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('✅ CSV exported');
+    } catch (error) {
+        showToast('Error exporting CSV', 'error');
+    }
+}
+
 function setExpenseFilter(filter) {
     expenseFilter = filter;
     document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.toggle('active', chip.id === `filter-${filter}`));
