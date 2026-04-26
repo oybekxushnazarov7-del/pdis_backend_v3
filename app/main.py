@@ -9,6 +9,8 @@ import os
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
+# ✅ YANGI: auth.py dagi router (refresh endpointi bor router)
+from app.auth import router as auth_methods_router 
 
 # Papka manzillarini aniqlash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -45,34 +47,6 @@ def create_tables():
             )
         """)
         
-        # Categories jadvali
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS categories (
-                id SERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                emoji TEXT,
-                description TEXT
-            )
-        """)
-        
-        # Standart kategoriyalarni qo'shish
-        categories = [
-            ("Technology & Gadgets", "🎮", "Electronics, software, tech subscriptions"),
-            ("Travel & Adventure", "✈️", "Flights, hotels, tours, experiences"),
-            ("Health & Wellness", "💪", "Gym, doctor, medicine, sports"),
-            ("Education & Growth", "📚", "Courses, books, training, certifications"),
-            ("Home & Living", "🏠", "Rent, utilities, furniture, home improvement"),
-            ("Food & Dining", "🍽️", "Restaurants, groceries, coffee"),
-            ("Entertainment", "🎬", "Movies, concerts, games, hobbies"),
-            ("Business & Professional", "💼", "Office supplies, conferences, tools"),
-        ]
-        
-        for name, emoji, description in categories:
-            cursor.execute(
-                "INSERT INTO categories (name, emoji, description) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
-                (name, emoji, description)
-            )
-        
         # Expenses jadvali
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
@@ -81,6 +55,17 @@ def create_tables():
                 amount REAL NOT NULL,
                 category TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Budgets jadvali
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS budgets (
+                id SERIAL PRIMARY KEY,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                month_year TEXT NOT NULL,
+                amount REAL NOT NULL,
+                UNIQUE(account_id, month_year)
             )
         """)
         
@@ -107,7 +92,8 @@ app.add_middleware(
 )
 
 # ✅ API Routerlarni ulash
-app.include_router(auth_router)  # Login/Register/Refresh
+app.include_router(auth_router)  # Login/Register (/auth/login)
+app.include_router(auth_methods_router) # ✅ YANGI: Refresh endpointi (/auth/refresh)
 app.include_router(users_router) # Userlar bilan ishlash
 app.include_router(expenses.router) # Xarajatlar
 

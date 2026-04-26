@@ -309,6 +309,18 @@ async function loadStats() {
         document.getElementById('stat-expenses').textContent = Array.isArray(expenses) ? expenses.length : 0;
         const total = Array.isArray(expenses) ? expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) : 0;
         document.getElementById('stat-total').textContent = total.toLocaleString() + ' so\'m';
+
+        // Load budget for current month
+        const now = new Date();
+        const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const budgetRes = await authFetch(`/expenses/budget/${monthYear}`);
+        if (budgetRes) {
+            const budgetData = await budgetRes.json();
+            const budget = budgetData.amount || 0;
+            const remaining = budget - total;
+            document.getElementById('stat-budget').textContent = remaining.toLocaleString() + ' so\'m';
+            document.getElementById('stat-budget').className = remaining < 0 ? 'stat-value pink' : 'stat-value green';
+        }
     } catch (error) {
         console.warn('Stats error', error);
     }

@@ -47,12 +47,12 @@ class RefreshRequest(BaseModel):
 def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
     payload = decode_token(token)
     if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Token noto'g'ri yoki muddati o'tgan")
     if payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Access token required")
+        raise HTTPException(status_code=401, detail="Access token kerak")
     account_id = payload.get("user_id")
     if account_id is None:
-        raise HTTPException(status_code=401, detail="No user_id in token")
+        raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
     return account_id
 
 
@@ -78,14 +78,14 @@ def _send_verification_email(email: str, code: str) -> None:
         return
 
     msg = EmailMessage()
-    msg["Subject"] = "PDIS Email Verification Code"
+    msg["Subject"] = "PDIS email tasdiqlash kodi"
     msg["From"] = smtp_from
     msg["To"] = email
     msg.set_content(
-        "Hello!\n\n"
-        f"Your PDIS verification code is: {code}\n"
-        "This code is valid for 5 minutes.\n\n"
-        "If you did not request this, please ignore this email."
+        "Salom!\n\n"
+        f"Sizning PDIS tasdiqlash kodingiz: {code}\n"
+        "Kod 5 daqiqa davomida amal qiladi.\n\n"
+        "Agar bu so'rovni siz yubormagan bo'lsangiz, xatni e'tiborsiz qoldiring."
     )
 
     with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
@@ -101,7 +101,7 @@ def _send_verification_email_or_raise(email: str, code: str) -> None:
     except Exception:
         raise HTTPException(
             status_code=503,
-            detail="Could not send verification email. Check SMTP settings."
+            detail="Tasdiqlash emailini yuborib bo'lmadi. SMTP sozlamalarini tekshiring."
         )
 
 
@@ -122,7 +122,7 @@ def register(data: RegisterData):
     if not _is_strong_password(data.password):
         raise HTTPException(
             status_code=400,
-            detail="Password must be at least 8 characters with uppercase, lowercase, number and symbol"
+            detail="Parol kamida 8 ta belgi bo'lsin va katta/kichik harf, raqam hamda belgi bo'lsin"
         )
 
     conn = get_connection()
@@ -139,7 +139,7 @@ def register(data: RegisterData):
         )
         existing = cursor.fetchone()
         if existing and existing[1]:
-            raise HTTPException(status_code=400, detail="This email is already registered")
+            raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan")
 
         if existing:
             cursor.execute(
@@ -170,7 +170,7 @@ def register(data: RegisterData):
 
         conn.commit()
         _send_verification_email_or_raise(data.email, code)
-        return {"message": "Verification code sent to your email"}
+        return {"message": "Tasdiqlash kodi emailingizga yuborildi"}
     except HTTPException:
         conn.rollback()
         raise
@@ -192,9 +192,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
         account = cursor.fetchone()
         if not account:
-            raise HTTPException(status_code=400, detail="User not found")
+            raise HTTPException(status_code=400, detail="Foydalanuvchi topilmadi")
         if not verify(form_data.password, account[3]):
-            raise HTTPException(status_code=400, detail="Incorrect password")
+            raise HTTPException(status_code=400, detail="Parol noto'g'ri")
         cursor.execute(
             "SELECT email_verified FROM accounts WHERE id = %s",
             (account[0],)
@@ -203,7 +203,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not email_verified:
             raise HTTPException(
                 status_code=403,
-                detail="Email not verified. Please enter verification code first."
+                detail="Email tasdiqlanmagan. Avval tasdiqlash kodini kiriting."
             )
         access_token = create_access_token({"user_id": account[0]})
         refresh_token = create_refresh_token({"user_id": account[0]})
@@ -215,7 +215,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login xatosi: {str(e)}")
     finally:
         conn.close()
 
@@ -237,20 +237,20 @@ def verify_email(data: VerifyEmailData):
         if not account:
             raise HTTPException(status_code=404, detail="Account topilmadi")
         if account[4]:
-            return {"message": "Email already verified"}
+            return {"message": "Email allaqachon tasdiqlangan"}
         if not account[1] or not account[2]:
-            raise HTTPException(status_code=400, detail="Verification code not found. Try requesting a new one.")
+            raise HTTPException(status_code=400, detail="Tasdiqlash kodi topilmadi. Qayta yuboring.")
         if account[3] >= 5:
-            raise HTTPException(status_code=400, detail="Too many incorrect attempts. Request a new code.")
+            raise HTTPException(status_code=400, detail="Juda ko'p noto'g'ri urinish. Yangi kod so'rang.")
         if datetime.utcnow() > account[2]:
-            raise HTTPException(status_code=400, detail="Code has expired. Request a new one.")
+            raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
         if _hash_verification_code(data.code) != account[1]:
             cursor.execute(
                 "UPDATE accounts SET verification_attempts = verification_attempts + 1 WHERE id = %s",
                 (account[0],)
             )
             conn.commit()
-            raise HTTPException(status_code=400, detail="Incorrect code")
+            raise HTTPException(status_code=400, detail="Kod noto'g'ri")
 
         cursor.execute(
             """
@@ -264,7 +264,7 @@ def verify_email(data: VerifyEmailData):
             (account[0],)
         )
         conn.commit()
-        return {"message": "Email verified successfully"}
+        return {"message": "Email muvaffaqiyatli tasdiqlandi"}
     except HTTPException:
         conn.rollback()
         raise
@@ -292,10 +292,10 @@ def resend_verification(data: ResendVerificationData):
         if not account:
             raise HTTPException(status_code=404, detail="Account topilmadi")
         if account[1]:
-            raise HTTPException(status_code=400, detail="This email is already verified")
+            raise HTTPException(status_code=400, detail="Bu email allaqachon tasdiqlangan")
 
         if account[2] and (datetime.utcnow() - account[2]).total_seconds() < 60:
-            raise HTTPException(status_code=429, detail="Request new code after 60 seconds")
+            raise HTTPException(status_code=429, detail="Yangi kodni 60 soniyadan keyin so'rang")
 
         code = _generate_verification_code()
         code_hash = _hash_verification_code(code)

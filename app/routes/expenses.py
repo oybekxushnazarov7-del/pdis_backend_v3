@@ -12,6 +12,11 @@ class ExpenseCreate(BaseModel):
     amount: float
 
 
+class BudgetCreate(BaseModel):
+    month_year: str  # YYYY-MM
+    amount: float
+
+
 class CategoryResponse(BaseModel):
     id: int
     name: str
@@ -103,5 +108,108 @@ def delete_expense(expense_id: int, account_id: int = Depends(get_current_accoun
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.post("/budget")
+def set_budget(budget: BudgetCreate, account_id: int = Depends(get_current_account_id)):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO budgets (account_id, month_year, amount) VALUES (%s, %s, %s) ON CONFLICT (account_id, month_year) DO UPDATE SET amount = EXCLUDED.amount",
+            (account_id, budget.month_year, budget.amount)
+        )
+        conn.commit()
+        return {"message": "Budget set successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.get("/budget/{month_year}")
+def get_budget(month_year: str, account_id: int = Depends(get_current_account_id)):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT amount FROM budgets WHERE account_id = %s AND month_year = %s",
+            (account_id, month_year)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {"amount": row[0]}
+        return {"amount": 0}
+    finally:
+        conn.close()
+
+
+@router.get("/analytics/{month_year}")
+def get_analytics(month_year: str, account_id: int = Depends(get_current_account_id)):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        # Total expenses for the month
+        cursor.execute(
+            "SELECT SUM(amount) FROM expenses WHERE account_id = %s AND strftime('%%Y-%%m', created_at) = %s",
+            (account_id, month_year)
+        )
+        total_expenses = cursor.fetchone()[0] or 0
+        
+        # Category breakdown
+        cursor.execute(
+            "SELECT category, SUM(amount) FROM expenses WHERE account_id = %s AND strftime('%%Y-%%m', created_at) = %s GROUP BY category",
+            (account_id, month_year)
+        )
+        categories = [{"category": r[0], "amount": r[1]} for r in cursor.fetchall()]
+        
+        # Budget
+        cursor.execute(
+            "SELECT amount FROM budgets WHERE account_id = %s AND month_year = %s",
+            (account_id, month_year)
+        )
+        budget_row = cursor.fetchone()
+        budget = budget_row[0] if budget_row else 0
+        
+        return {
+            "total_expenses": total_expenses,
+            "budget": budget,
+            "remaining": budget - total_expenses,
+            "categories": categories
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/export/csv")
+def export_expenses_csv(account_id: int = Depends(get_current_account_id)):
+    import csv
+    from io import StringIO
+    from fastapi.responses import StreamingResponse
+    
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, category, amount, created_at FROM expenses WHERE account_id = %s ORDER BY created_at DESC",
+            (account_id,)
+        )
+        rows = cursor.fetchall()
+        
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["ID", "Category", "Amount", "Date"])
+        for row in rows:
+            writer.writerow([row[0], row[1], row[2], row[3]])
+        
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=expenses.csv"}
+        )
     finally:
         conn.close()
