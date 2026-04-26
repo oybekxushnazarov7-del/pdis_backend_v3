@@ -9,10 +9,8 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
-# ✅ To'g'ri absolyut yo'lni aniqlash
+# Determine the root project directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Rasmdagi strukturaga ko'ra, static papkasi ildizda (root) joylashgan:
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 def create_tables():
@@ -38,6 +36,14 @@ def create_tables():
                 name TEXT NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                emoji TEXT,
+                description TEXT
             )
         """)
         cursor.execute("""
@@ -69,12 +75,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routerlar
+# Routers
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(expenses.router)
 
-# ✅ Static fayllarni ulash (index.html ichidagi js/css lar ishlashi uchun)
+# Mount static files so index.html and app.js work
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

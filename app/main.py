@@ -12,8 +12,8 @@ from app.routes import expenses
 # ✅ New: auth.py router with refresh endpoint
 from app.auth import router as auth_methods_router 
 
-# Determine folder paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Determine folder paths (root project directory)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 def create_tables():
@@ -47,6 +47,16 @@ def create_tables():
             )
         """)
         
+        # Categories table for expense categories
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                emoji TEXT,
+                description TEXT
+            )
+        """)
+
         # Expenses table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
@@ -71,7 +81,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PDIS API", lifespan=lifespan)
 
-# CORS sozlamalari
+# CORS settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -80,17 +90,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ API Routerlarni ulash
+# Mount API routers
 app.include_router(auth_router)  # Login/Register (/auth/login)
-app.include_router(auth_methods_router) # ✅ YANGI: Refresh endpointi (/auth/refresh)
-app.include_router(users_router) # Userlar bilan ishlash
-app.include_router(expenses.router) # Xarajatlar
+app.include_router(auth_methods_router)  # Refresh endpoint (/auth/refresh)
+app.include_router(users_router)  # User endpoints
+app.include_router(expenses.router)  # Expense endpoints
 
-# Static fayllarni ulash
+# Mount static files
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Asosiy sahifa
+# Root page
 @app.get("/")
 async def home():
     index_path = os.path.join(STATIC_DIR, "index.html")
@@ -99,6 +109,6 @@ async def home():
     
     return {
         "status": "error",
-        "message": "index.html topilmadi",
+        "message": "index.html not found",
         "debug_path": index_path
     }

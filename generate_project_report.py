@@ -298,121 +298,121 @@ def build():
     )
     story.append(deploy_table)
 
-    # Uzbek section
+    # English summary section
     story.append(PageBreak())
-    story.append(p("Language 2: Uzbek (O'zbekcha)", h1))
+    story.append(p("Language 2: English", h1))
 
-    story.append(p("1) Qisqacha mazmun", h2))
+    story.append(p("1) Summary", h2))
     story.append(
         p(
-            "PDIS - bu shaxsiy boshqaruv va xarajatlarni kuzatish uchun yengil veb tizim. "
-            "Loyihada akkaunt ochish/kirish, foydalanuvchilarni boshqarish, xarajat qo'shish va dashboard funksiyalari mavjud. "
-            "Texnik stack sodda va amaliy: FastAPI, PostgreSQL, static frontend.",
+            "PDIS is a lightweight web app for personal management and expense tracking. "
+            "It supports account registration/login, user management, expense entry, and a dashboard. "
+            "The technical stack is practical and simple: FastAPI, PostgreSQL, and a static frontend.",
             body,
         )
     )
     story.append(Spacer(1, 6))
 
-    story.append(p("2) Bu sayt nimaga kerak?", h2))
+    story.append(p("2) What is this app for?", h2))
     story.append(
         bullet_list(
             [
-                "Kundalik, haftalik va oylik xarajatlarni bir joyda yuritish uchun.",
-                "Bitta akkaunt ichida o'ziga tegishli userlar ro'yxatini boshqarish uchun.",
-                "Dashboard orqali tez tahlil qilib, qaror qabul qilishni osonlashtirish uchun.",
-                "Portfolio va real deploy tajribasi uchun full-stack amaliy loyiha sifatida.",
+                "Track daily, weekly, and monthly expenses in one place.",
+                "Manage a list of related users under a single account.",
+                "Use the dashboard for quick analysis to support decisions.",
+                "Use it as a full-stack portfolio project with real deployment experience.",
             ],
             body,
         )
     )
     story.append(Spacer(1, 6))
 
-    story.append(p("3) Nimalar ishlatilgan va nega?", h2))
+    story.append(p("3) Why these technologies?", h2))
     story.append(
         bullet_list(
             [
-                "<b>FastAPI</b>: tez API yozish va routelarni toza ajratish uchun.",
-                "<b>PostgreSQL + psycopg2</b>: ishonchli SQL bazasi bilan ishlash uchun.",
-                "<b>JWT</b>: token asosida xavfsiz sessiya boshqaruvi uchun.",
-                "<b>Passlib</b>: parolni hash qilib saqlash uchun.",
-                "<b>HTML/CSS/JS</b>: buildsiz tez frontend ishlab chiqish uchun.",
-                "<b>Render</b>: cloudga joylash va deployni avtomatlashtirish uchun.",
+                "<b>FastAPI</b>: for fast API development and clean routing.",
+                "<b>PostgreSQL + psycopg2</b>: for reliable SQL database access.",
+                "<b>JWT</b>: for secure session management with tokens.",
+                "<b>Passlib</b>: for securely hashing passwords.",
+                "<b>HTML/CSS/JS</b>: for a quick build-free frontend.",
+                "<b>Render</b>: for cloud deployment and automated hosting.",
             ],
             body,
         )
     )
     story.append(Spacer(1, 6))
 
-    story.append(p("4) Ishlash oqimi (flow)", h2))
+    story.append(p("4) How it works", h2))
     story.append(
         bullet_list(
             [
-                "Foydalanuvchi login qiladi -> /auth/login orqali token oladi.",
-                "Access/refresh token localStorage ga saqlanadi.",
-                "Keyingi /users va /expenses so'rovlari Bearer token bilan yuboriladi.",
-                "Backend token ichidagi user_id orqali account scope ni tekshiradi.",
-                "Ma'lumotlar Postgresga yoziladi va UI ga JSON qaytadi.",
+                "The user logs in via /auth/login and receives a token.",
+                "Access/refresh tokens are stored in localStorage.",
+                "Subsequent /users and /expenses requests use the Bearer token.",
+                "The backend validates account scope with user_id from the token.",
+                "Data is stored in Postgres and returned as JSON to the UI.",
             ],
             body,
         )
     )
     story.append(Spacer(1, 6))
 
-    story.append(p("5) Siz hozir aynan nimalarni qildingiz?", h2))
+    story.append(p("5) Improvements made", h2))
     story.append(
         bullet_list(
             [
-                "Telefon ko'rinishidagi sidebar muammosi aniqlandi va tuzatildi.",
-                "Chap yuqoriga hamburger menyu qo'shildi (mobil uchun overlay bilan).",
-                "Desktop va telefon uchun sidebar toggle bir xil ishlaydigan qilindi.",
-                "Mobil bottom navigation qo'shildi.",
-                "Quick add (+) modal orqali tez xarajat kiritish qo'shildi.",
-                "Xarajatlarga vaqt filtri qo'shildi: Barchasi, Bugun, Hafta, Oy.",
-                "Asosiy backend mantiqi o'zgartirilmadi, faqat UX kuchaytirildi.",
+                "Fixed the mobile-style sidebar behavior.",
+                "Added a top-left hamburger menu overlay for mobile.",
+                "Unified sidebar toggling for desktop and mobile.",
+                "Added mobile bottom navigation.",
+                "Added a quick add (+) modal for fast expense entry.",
+                "Added expense time filters: All, Today, Week, Month.",
+                "Kept backend logic intact while improving UX.",
             ],
             body,
         )
     )
     story.append(Spacer(1, 6))
 
-    story.append(p("6) Hayotda qanday foyda beradi?", h2))
+    story.append(p("6) Benefit in real use", h2))
     story.append(
         bullet_list(
             [
-                "Frilanserlar uchun: loyiha xarajatlarini kuzatish.",
-                "Kichik biznes uchun: jamoa va xarajatlarni tartibda olib borish.",
-                "Talabalar uchun: oylik budjetni nazorat qilish.",
-                "Oilaviy foydalanishda: xarajat kategoriyalarini monitoring qilish.",
+                "For freelancers: track project expenses.",
+                "For small businesses: manage team and spending.",
+                "For students: keep monthly expenses disciplined.",
+                "For family use: monitor expense categories.",
             ],
             body,
         )
     )
     story.append(Spacer(1, 6))
 
-    story.append(p("7) Keyingi yaxshilashlar tavsiyasi", h2))
+    story.append(p("7) Next improvement suggestions", h2))
     story.append(
         bullet_list(
             [
-                ".env orqali maxfiy sozlamalarni koddan chiqarish.",
-                "README ni to'liq va aniq qilib yangilash.",
-                "Avtomatik testlar (pytest) qo'shish.",
-                "PWA qilish (telefonda app sifatida o'rnatish).",
-                "Grafik/analitika va eksport funksiyalarini qo'shish.",
+                "Move secrets into .env instead of code.",
+                "Update the README fully and clearly.",
+                "Add automated tests with pytest.",
+                "Add PWA support for installable mobile use.",
+                "Add charts/analytics and export functions.",
             ],
             body,
         )
     )
     story.append(Spacer(1, 8))
 
-    story.append(p("8) Render ga deploy qilish bosqichlari", h2))
+    story.append(p("8) Deploy steps to Render", h2))
     deploy_table_uz = Table(
         [
-            ["Qadam", "Amal"],
-            ["1", "Lokal o'zgarishlarni commit qilib GitHub ga push qiling."],
-            ["2", "Render dashboardda to'g'ri branch ulanganini tekshiring."],
-            ["3", "Start command to'g'ri entrypoint ga qaraganini tasdiqlang."],
-            ["4", "Deploy ishga tushiring (yoki auto-deploy ni kuting)."],
-            ["5", "Deploy tugagach, telefonda/desktopda hard refresh qiling."],
+            ["Step", "Action"],
+            ["1", "Commit local changes and push them to GitHub."],
+            ["2", "Verify the correct branch is connected in Render dashboard."],
+            ["3", "Ensure the start command targets the correct entrypoint."],
+            ["4", "Run deploy or wait for auto-deploy."],
+            ["5", "After deploy, hard refresh in browser on mobile/desktop."],
         ],
         colWidths=[20 * mm, 145 * mm],
     )

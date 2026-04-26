@@ -47,12 +47,12 @@ class RefreshRequest(BaseModel):
 def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
     payload = decode_token(token)
     if not payload:
-        raise HTTPException(status_code=401, detail="Token noto'g'ri yoki muddati o'tgan")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     if payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Access token kerak")
+        raise HTTPException(status_code=401, detail="Access token required")
     account_id = payload.get("user_id")
     if account_id is None:
-        raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
+        raise HTTPException(status_code=401, detail="No user_id in token")
     return account_id
 
 
@@ -78,14 +78,14 @@ def _send_verification_email(email: str, code: str) -> None:
         return
 
     msg = EmailMessage()
-    msg["Subject"] = "PDIS email tasdiqlash kodi"
+    msg["Subject"] = "PDIS Email Verification Code"
     msg["From"] = smtp_from
     msg["To"] = email
     msg.set_content(
-        "Salom!\n\n"
-        f"Sizning PDIS tasdiqlash kodingiz: {code}\n"
-        "Kod 5 daqiqa davomida amal qiladi.\n\n"
-        "Agar bu so'rovni siz yubormagan bo'lsangiz, xatni e'tiborsiz qoldiring."
+        "Hello!\n\n"
+        f"Your PDIS verification code is: {code}\n"
+        "This code is valid for 5 minutes.\n\n"
+        "If you did not request this, please ignore this email."
     )
 
     with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
@@ -101,7 +101,7 @@ def _send_verification_email_or_raise(email: str, code: str) -> None:
     except Exception:
         raise HTTPException(
             status_code=503,
-            detail="Tasdiqlash emailini yuborib bo'lmadi. SMTP sozlamalarini tekshiring."
+            detail="Unable to send verification email. Check SMTP settings."
         )
 
 
@@ -122,7 +122,7 @@ def register(data: RegisterData):
     if not _is_strong_password(data.password):
         raise HTTPException(
             status_code=400,
-            detail="Parol kamida 8 ta belgi bo'lsin va katta/kichik harf, raqam hamda belgi bo'lsin"
+            detail="Password must be at least 8 characters and include upper/lower case letters, a number, and a symbol."
         )
 
     conn = get_connection()
@@ -139,7 +139,7 @@ def register(data: RegisterData):
         )
         existing = cursor.fetchone()
         if existing and existing[1]:
-            raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan")
+            raise HTTPException(status_code=400, detail="This email is already registered")
 
         if existing:
             cursor.execute(
@@ -215,7 +215,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Login xatosi: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     finally:
         conn.close()
 
@@ -270,7 +270,7 @@ def verify_email(data: VerifyEmailData):
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     finally:
         conn.close()
 
@@ -399,6 +399,6 @@ def delete_user(user_id: int, account_id: int = Depends(get_current_account_id))
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     finally:
         conn.close()
