@@ -47,6 +47,34 @@ def create_tables():
             )
         """)
         
+        # Categories jadvali
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                emoji TEXT,
+                description TEXT
+            )
+        """)
+        
+        # Standart kategoriyalarni qo'shish
+        categories = [
+            ("Technology & Gadgets", "🎮", "Electronics, software, tech subscriptions"),
+            ("Travel & Adventure", "✈️", "Flights, hotels, tours, experiences"),
+            ("Health & Wellness", "💪", "Gym, doctor, medicine, sports"),
+            ("Education & Growth", "📚", "Courses, books, training, certifications"),
+            ("Home & Living", "🏠", "Rent, utilities, furniture, home improvement"),
+            ("Food & Dining", "🍽️", "Restaurants, groceries, coffee"),
+            ("Entertainment", "🎬", "Movies, concerts, games, hobbies"),
+            ("Business & Professional", "💼", "Office supplies, conferences, tools"),
+        ]
+        
+        for name, emoji, description in categories:
+            cursor.execute(
+                "INSERT INTO categories (name, emoji, description) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                (name, emoji, description)
+            )
+        
         # Expenses jadvali
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (

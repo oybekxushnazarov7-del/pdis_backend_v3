@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 SECRET_KEY = "super_secret_key_change_in_production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 300    # 5 soat
-REFRESH_TOKEN_EXPIRE_DAYS = 7        # 7 kun
+ACCESS_TOKEN_EXPIRE_MINUTES = 300    # 5 hours
+REFRESH_TOKEN_EXPIRE_DAYS = 7        # 7 days
 
 pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
