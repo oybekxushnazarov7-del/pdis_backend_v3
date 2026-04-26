@@ -350,9 +350,38 @@
       <label>Parol</label>
       <input type="password" id="reg-password" placeholder="Parol kiriting"/>
     </div>
+    <div class="form-group">
+      <label>Parolni tasdiqlang</label>
+      <input type="password" id="reg-password-confirm" placeholder="Parolni qayta kiriting"/>
+    </div>
     <button class="btn btn-primary" onclick="doRegister()">Ro'yxatdan o'tish</button>
     <div class="auth-switch">
       Akkauntingiz bormi? <a onclick="showPage('page-login')">Kirish</a>
+    </div>
+  </div>
+</div>
+
+<!-- VERIFY EMAIL -->
+<div class="page auth-page" id="page-verify-email">
+  <div class="auth-box">
+    <div class="auth-logo">PDIS</div>
+    <div class="auth-subtitle">Email tasdiqlash</div>
+    <div class="error-msg" id="verify-error"></div>
+    <div class="success-msg" id="verify-success"></div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="verify-email" placeholder="email@example.com"/>
+    </div>
+    <div class="form-group">
+      <label>6 xonali kod</label>
+      <input type="text" id="verify-code" placeholder="123456" maxlength="6"/>
+    </div>
+    <button class="btn btn-primary" onclick="verifyEmailCode()">Tasdiqlash</button>
+    <div class="auth-switch">
+      Kod kelmadimi? <a onclick="resendVerificationCode()">Qayta yuborish</a>
+    </div>
+    <div class="auth-switch">
+      <a onclick="showPage('page-login')">Kirish sahifasiga qaytish</a>
     </div>
   </div>
 </div>
@@ -502,6 +531,7 @@
   let accessToken = localStorage.getItem('pdis_access') || '';
   let refreshToken = localStorage.getItem('pdis_refresh') || '';
   let userEmail = localStorage.getItem('pdis_email') || '';
+  let pendingVerificationEmail = localStorage.getItem('pdis_pending_verification_email') || '';
   let expenseFilter = 'all';
 
   window.onload = () => {
@@ -509,6 +539,10 @@
       showPage('page-dashboard');
       document.getElementById('sidebar-email').textContent = userEmail;
       loadStats();
+    } else if (pendingVerificationEmail) {
+      const verifyInput = document.getElementById('verify-email');
+      if (verifyInput) verifyInput.value = pendingVerificationEmail;
+      showPage('page-verify-email');
     } else {
       showPage('page-login');
     }
@@ -583,12 +617,17 @@
     const name = document.getElementById('reg-name').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
+    const passwordConfirm = document.getElementById('reg-password-confirm').value;
     const errEl = document.getElementById('reg-error');
     const sucEl = document.getElementById('reg-success');
     errEl.style.display = 'none';
     sucEl.style.display = 'none';
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !passwordConfirm) {
       errEl.textContent = "Barcha maydonlarni to'ldiring!";
+      errEl.style.display = 'block'; return;
+    }
+    if (password !== passwordConfirm) {
+      errEl.textContent = "Parollar bir xil emas";
       errEl.style.display = 'block'; return;
     }
     try {
@@ -599,14 +638,87 @@
       });
       const data = await res.json();
       if (res.ok) {
-        sucEl.textContent = "✅ Muvaffaqiyatli! Endi kiring.";
+        pendingVerificationEmail = email;
+        localStorage.setItem('pdis_pending_verification_email', pendingVerificationEmail);
+        const verifyInput = document.getElementById('verify-email');
+        if (verifyInput) verifyInput.value = pendingVerificationEmail;
+        sucEl.textContent = "✅ Kod emailingizga yuborildi. Endi tasdiqlang.";
         sucEl.style.display = 'block';
-        setTimeout(() => showPage('page-login'), 1500);
+        setTimeout(() => showPage('page-verify-email'), 900);
       } else {
         errEl.textContent = data.detail || 'Xato yuz berdi';
         errEl.style.display = 'block';
       }
     } catch(e) {
+      errEl.textContent = 'Server bilan aloqa yo\'q!';
+      errEl.style.display = 'block';
+    }
+  }
+
+  async function verifyEmailCode() {
+    const emailInput = document.getElementById('verify-email');
+    const codeInput = document.getElementById('verify-code');
+    const errEl = document.getElementById('verify-error');
+    const sucEl = document.getElementById('verify-success');
+    const email = emailInput.value.trim();
+    const code = codeInput.value.trim();
+    errEl.style.display = 'none';
+    sucEl.style.display = 'none';
+
+    if (!email || !code) {
+      errEl.textContent = "Email va kodni kiriting";
+      errEl.style.display = 'block'; return;
+    }
+
+    try {
+      const res = await fetch(API + '/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.removeItem('pdis_pending_verification_email');
+        pendingVerificationEmail = '';
+        sucEl.textContent = "✅ Email tasdiqlandi. Endi tizimga kiring.";
+        sucEl.style.display = 'block';
+        setTimeout(() => showPage('page-login'), 1000);
+      } else {
+        errEl.textContent = data.detail || 'Tasdiqlashda xato';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      errEl.textContent = 'Server bilan aloqa yo\'q!';
+      errEl.style.display = 'block';
+    }
+  }
+
+  async function resendVerificationCode() {
+    const emailInput = document.getElementById('verify-email');
+    const errEl = document.getElementById('verify-error');
+    const sucEl = document.getElementById('verify-success');
+    const email = emailInput.value.trim();
+    errEl.style.display = 'none';
+    sucEl.style.display = 'none';
+    if (!email) {
+      errEl.textContent = "Avval emailni kiriting";
+      errEl.style.display = 'block'; return;
+    }
+    try {
+      const res = await fetch(API + '/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sucEl.textContent = "✅ Yangi kod yuborildi";
+        sucEl.style.display = 'block';
+      } else {
+        errEl.textContent = data.detail || 'Kod yuborilmadi';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
       errEl.textContent = 'Server bilan aloqa yo\'q!';
       errEl.style.display = 'block';
     }
@@ -643,6 +755,19 @@
         loadStats();
         showToast('Xush kelibsiz! 👋');
       } else {
+        if (res.status === 403) {
+          pendingVerificationEmail = email;
+          localStorage.setItem('pdis_pending_verification_email', pendingVerificationEmail);
+          const verifyInput = document.getElementById('verify-email');
+          const verifyErr = document.getElementById('verify-error');
+          if (verifyInput) verifyInput.value = pendingVerificationEmail;
+          if (verifyErr) {
+            verifyErr.textContent = data.detail || 'Email tasdiqlanmagan';
+            verifyErr.style.display = 'block';
+          }
+          showPage('page-verify-email');
+          return;
+        }
         errEl.textContent = data.detail || 'Email yoki parol noto\'g\'ri';
         errEl.style.display = 'block';
       }
@@ -816,6 +941,7 @@
     if (e.key === 'Enter') {
       if (document.getElementById('page-login').classList.contains('active')) doLogin();
       if (document.getElementById('page-register').classList.contains('active')) doRegister();
+      if (document.getElementById('page-verify-email').classList.contains('active')) verifyEmailCode();
     }
     if (e.key === 'Escape') closeSidebar();
   });

@@ -1,4 +1,11 @@
 import psycopg2
+from datetime import datetime, timedelta
+import hashlib
+import os
+import random
+import smtplib
+from email.message import EmailMessage
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from app.db import get_connection
@@ -17,6 +24,15 @@ class RegisterData(BaseModel):
     name: str
     email: EmailStr
     password: str
+
+
+class VerifyEmailData(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResendVerificationData(BaseModel):
+    email: EmailStr
 
 
 class UserCreate(BaseModel):
@@ -40,23 +56,114 @@ def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
     return account_id
 
 
+def _hash_verification_code(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+def _generate_verification_code() -> str:
+    return f"{random.randint(0, 999999):06d}"
+
+
+def _send_verification_email(email: str, code: str) -> None:
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@pdis.local")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+
+    # Dev fallback: if SMTP is not configured, keep flow usable locally.
+    if not smtp_host or not smtp_user or not smtp_password:
+        print(f"[DEV] Email verification code for {email}: {code}")
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = "PDIS email tasdiqlash kodi"
+    msg["From"] = smtp_from
+    msg["To"] = email
+    msg.set_content(
+        "Salom!\n\n"
+        f"Sizning PDIS tasdiqlash kodingiz: {code}\n"
+        "Kod 5 daqiqa davomida amal qiladi.\n\n"
+        "Agar bu so'rovni siz yubormagan bo'lsangiz, xatni e'tiborsiz qoldiring."
+    )
+
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+        if smtp_use_tls:
+            server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+
+
+def _is_strong_password(password: str) -> bool:
+    if len(password) < 8:
+        return False
+    has_upper = any(ch.isupper() for ch in password)
+    has_lower = any(ch.islower() for ch in password)
+    has_digit = any(ch.isdigit() for ch in password)
+    has_symbol = any(not ch.isalnum() for ch in password)
+    return has_upper and has_lower and has_digit and has_symbol
+
+
 # ==================== AUTH ====================
 
 @auth_router.post("/register")
 def register(data: RegisterData):
+    if not _is_strong_password(data.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Parol kamida 8 ta belgi bo'lsin va katta/kichik harf, raqam hamda belgi bo'lsin"
+        )
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
         hashed_pwd = get_hash(data.password)
+        code = _generate_verification_code()
+        code_hash = _hash_verification_code(code)
+        expires_at = datetime.utcnow() + timedelta(minutes=5)
+
         cursor.execute(
-            "INSERT INTO accounts (name, email, password) VALUES (%s, %s, %s)",
-            (data.name, data.email, hashed_pwd)
+            "SELECT id, email_verified FROM accounts WHERE email = %s",
+            (data.email,)
         )
+        existing = cursor.fetchone()
+        if existing and existing[1]:
+            raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan")
+
+        if existing:
+            cursor.execute(
+                """
+                UPDATE accounts
+                SET name = %s,
+                    password = %s,
+                    verification_code_hash = %s,
+                    verification_expires_at = %s,
+                    verification_attempts = 0,
+                    last_verification_sent_at = NOW()
+                WHERE id = %s
+                """,
+                (data.name, hashed_pwd, code_hash, expires_at, existing[0])
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO accounts (
+                    name, email, password, email_verified,
+                    verification_code_hash, verification_expires_at,
+                    verification_attempts, last_verification_sent_at
+                )
+                VALUES (%s, %s, %s, FALSE, %s, %s, 0, NOW())
+                """,
+                (data.name, data.email, hashed_pwd, code_hash, expires_at)
+            )
+
         conn.commit()
-        return {"message": "Muvaffaqiyatli ro'yxatdan o'tdingiz!"}
-    except psycopg2.errors.UniqueViolation:
+        _send_verification_email(data.email, code)
+        return {"message": "Tasdiqlash kodi emailingizga yuborildi"}
+    except HTTPException:
         conn.rollback()
-        raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan")
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
@@ -78,6 +185,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             raise HTTPException(status_code=400, detail="Foydalanuvchi topilmadi")
         if not verify(form_data.password, account[3]):
             raise HTTPException(status_code=400, detail="Parol noto'g'ri")
+        cursor.execute(
+            "SELECT email_verified FROM accounts WHERE id = %s",
+            (account[0],)
+        )
+        email_verified = cursor.fetchone()[0]
+        if not email_verified:
+            raise HTTPException(
+                status_code=403,
+                detail="Email tasdiqlanmagan. Avval tasdiqlash kodini kiriting."
+            )
         access_token = create_access_token({"user_id": account[0]})
         refresh_token = create_refresh_token({"user_id": account[0]})
         return {
@@ -89,6 +206,110 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Login xatosi: {str(e)}")
+    finally:
+        conn.close()
+
+
+@auth_router.post("/verify-email")
+def verify_email(data: VerifyEmailData):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, verification_code_hash, verification_expires_at, verification_attempts, email_verified
+            FROM accounts
+            WHERE email = %s
+            """,
+            (data.email,)
+        )
+        account = cursor.fetchone()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account topilmadi")
+        if account[4]:
+            return {"message": "Email allaqachon tasdiqlangan"}
+        if not account[1] or not account[2]:
+            raise HTTPException(status_code=400, detail="Tasdiqlash kodi topilmadi. Qayta yuboring.")
+        if account[3] >= 5:
+            raise HTTPException(status_code=400, detail="Juda ko'p noto'g'ri urinish. Yangi kod so'rang.")
+        if datetime.utcnow() > account[2]:
+            raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
+        if _hash_verification_code(data.code) != account[1]:
+            cursor.execute(
+                "UPDATE accounts SET verification_attempts = verification_attempts + 1 WHERE id = %s",
+                (account[0],)
+            )
+            conn.commit()
+            raise HTTPException(status_code=400, detail="Kod noto'g'ri")
+
+        cursor.execute(
+            """
+            UPDATE accounts
+            SET email_verified = TRUE,
+                verification_code_hash = NULL,
+                verification_expires_at = NULL,
+                verification_attempts = 0
+            WHERE id = %s
+            """,
+            (account[0],)
+        )
+        conn.commit()
+        return {"message": "Email muvaffaqiyatli tasdiqlandi"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
+    finally:
+        conn.close()
+
+
+@auth_router.post("/resend-verification")
+def resend_verification(data: ResendVerificationData):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, email_verified, last_verification_sent_at
+            FROM accounts
+            WHERE email = %s
+            """,
+            (data.email,)
+        )
+        account = cursor.fetchone()
+        if not account:
+            raise HTTPException(status_code=404, detail="Account topilmadi")
+        if account[1]:
+            raise HTTPException(status_code=400, detail="Bu email allaqachon tasdiqlangan")
+
+        if account[2] and (datetime.utcnow() - account[2]).total_seconds() < 60:
+            raise HTTPException(status_code=429, detail="Yangi kodni 60 soniyadan keyin so'rang")
+
+        code = _generate_verification_code()
+        code_hash = _hash_verification_code(code)
+        expires_at = datetime.utcnow() + timedelta(minutes=5)
+        cursor.execute(
+            """
+            UPDATE accounts
+            SET verification_code_hash = %s,
+                verification_expires_at = %s,
+                verification_attempts = 0,
+                last_verification_sent_at = NOW()
+            WHERE id = %s
+            """,
+            (code_hash, expires_at, account[0])
+        )
+        conn.commit()
+        _send_verification_email(data.email, code)
+        return {"message": "Yangi tasdiqlash kodi yuborildi"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
     finally:
         conn.close()
 
