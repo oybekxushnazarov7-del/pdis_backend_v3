@@ -5,24 +5,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-# Modullarni import qilish
+# Import modules
 from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
-# ✅ YANGI: auth.py dagi router (refresh endpointi bor router)
+# ✅ New: auth.py router with refresh endpoint
 from app.auth import router as auth_methods_router 
 
-# Papka manzillarini aniqlash
+# Determine folder paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 def create_tables():
-    """Ma'lumotlar bazasi jadvallarini yaratish (ID SERIAL bilan)"""
+    """Create database tables (with SERIAL ids)"""
     try:
         conn = get_connection()
         cursor = conn.cursor()
         
-        # Accounts jadvali
+        # Accounts table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id SERIAL PRIMARY KEY,
@@ -37,7 +37,7 @@ def create_tables():
         cursor.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS verification_attempts INTEGER DEFAULT 0")
         cursor.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_verification_sent_at TIMESTAMP")
         
-        # Users jadvali (SERIAL ishlatilgan - id kiritish shart emas)
+        # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -47,7 +47,7 @@ def create_tables():
             )
         """)
         
-        # Expenses jadvali
+        # Expenses table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id SERIAL PRIMARY KEY,
@@ -58,22 +58,11 @@ def create_tables():
             )
         """)
         
-        # Budgets jadvali
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS budgets (
-                id SERIAL PRIMARY KEY,
-                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                month_year TEXT NOT NULL,
-                amount REAL NOT NULL,
-                UNIQUE(account_id, month_year)
-            )
-        """)
-        
         conn.commit()
         conn.close()
-        print("Jadvallar muvaffaqiyatli tekshirildi/yaratildi.")
+        print("Tables verified/created successfully.")
     except Exception as e:
-        print(f"Bazada xato: {e}")
+        print(f"Database error: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

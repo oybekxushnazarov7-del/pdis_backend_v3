@@ -170,13 +170,13 @@ def register(data: RegisterData):
 
         conn.commit()
         _send_verification_email_or_raise(data.email, code)
-        return {"message": "Tasdiqlash kodi emailingizga yuborildi"}
+        return {"message": "Verification code sent to your email"}
     except HTTPException:
         conn.rollback()
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     finally:
         conn.close()
 
@@ -192,9 +192,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
         account = cursor.fetchone()
         if not account:
-            raise HTTPException(status_code=400, detail="Foydalanuvchi topilmadi")
+            raise HTTPException(status_code=400, detail="User not found")
         if not verify(form_data.password, account[3]):
-            raise HTTPException(status_code=400, detail="Parol noto'g'ri")
+            raise HTTPException(status_code=400, detail="Incorrect password")
         cursor.execute(
             "SELECT email_verified FROM accounts WHERE id = %s",
             (account[0],)
@@ -203,7 +203,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not email_verified:
             raise HTTPException(
                 status_code=403,
-                detail="Email tasdiqlanmagan. Avval tasdiqlash kodini kiriting."
+                detail="Email not verified. Please enter the verification code first."
             )
         access_token = create_access_token({"user_id": account[0]})
         refresh_token = create_refresh_token({"user_id": account[0]})
@@ -235,22 +235,22 @@ def verify_email(data: VerifyEmailData):
         )
         account = cursor.fetchone()
         if not account:
-            raise HTTPException(status_code=404, detail="Account topilmadi")
+            raise HTTPException(status_code=404, detail="Account not found")
         if account[4]:
-            return {"message": "Email allaqachon tasdiqlangan"}
+            return {"message": "Email is already verified"}
         if not account[1] or not account[2]:
-            raise HTTPException(status_code=400, detail="Tasdiqlash kodi topilmadi. Qayta yuboring.")
+            raise HTTPException(status_code=400, detail="Verification code not found. Please request it again.")
         if account[3] >= 5:
-            raise HTTPException(status_code=400, detail="Juda ko'p noto'g'ri urinish. Yangi kod so'rang.")
+            raise HTTPException(status_code=400, detail="Too many wrong attempts. Request a new code.")
         if datetime.utcnow() > account[2]:
-            raise HTTPException(status_code=400, detail="Kod muddati tugagan. Yangi kod so'rang.")
+            raise HTTPException(status_code=400, detail="Code expired. Request a new code.")
         if _hash_verification_code(data.code) != account[1]:
             cursor.execute(
                 "UPDATE accounts SET verification_attempts = verification_attempts + 1 WHERE id = %s",
                 (account[0],)
             )
             conn.commit()
-            raise HTTPException(status_code=400, detail="Kod noto'g'ri")
+            raise HTTPException(status_code=400, detail="Incorrect code")
 
         cursor.execute(
             """
@@ -290,12 +290,12 @@ def resend_verification(data: ResendVerificationData):
         )
         account = cursor.fetchone()
         if not account:
-            raise HTTPException(status_code=404, detail="Account topilmadi")
+            raise HTTPException(status_code=404, detail="Account not found")
         if account[1]:
-            raise HTTPException(status_code=400, detail="Bu email allaqachon tasdiqlangan")
+            raise HTTPException(status_code=400, detail="This email is already verified")
 
         if account[2] and (datetime.utcnow() - account[2]).total_seconds() < 60:
-            raise HTTPException(status_code=429, detail="Yangi kodni 60 soniyadan keyin so'rang")
+            raise HTTPException(status_code=429, detail="Please request a new code after 60 seconds")
 
         code = _generate_verification_code()
         code_hash = _hash_verification_code(code)
@@ -313,13 +313,13 @@ def resend_verification(data: ResendVerificationData):
         )
         conn.commit()
         _send_verification_email_or_raise(data.email, code)
-        return {"message": "Yangi tasdiqlash kodi yuborildi"}
+        return {"message": "New verification code sent"}
     except HTTPException:
         conn.rollback()
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     finally:
         conn.close()
 
@@ -328,12 +328,12 @@ def resend_verification(data: ResendVerificationData):
 def refresh_token(data: RefreshRequest):
     payload = decode_token(data.refresh_token)
     if not payload:
-        raise HTTPException(status_code=401, detail="Refresh token noto'g'ri")
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
     if payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Refresh token kerak")
+        raise HTTPException(status_code=401, detail="Refresh token required")
     user_id = payload.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=401, detail="Token ichida user_id yo'q")
+        raise HTTPException(status_code=401, detail="user_id is missing in token")
     new_access_token = create_access_token({"user_id": user_id})
     return {"access_token": new_access_token, "token_type": "bearer"}
 
@@ -351,13 +351,13 @@ def create_user(user: UserCreate, account_id: int = Depends(get_current_account_
         )
         new_id = cursor.fetchone()[0]
         conn.commit()
-        return {"message": "User qo'shildi!", "id": new_id, "name": user.name, "email": user.email}
+        return {"message": "User added!", "id": new_id, "name": user.name, "email": user.email}
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
-        raise HTTPException(status_code=400, detail="Bu email allaqachon mavjud")
+        raise HTTPException(status_code=400, detail="This email already exists")
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Xato: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
     finally:
         conn.close()
 
@@ -368,7 +368,7 @@ def get_users(account_id: int = Depends(get_current_account_id)):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            # ✅ ASC — eng eskisi tepada, yangi qo'shilgan oxirida
+            # ✅ ASC — oldest first, newest last
             "SELECT id, name, email FROM users WHERE account_id = %s ORDER BY id ASC",
             (account_id,)
         )
@@ -388,13 +388,13 @@ def delete_user(user_id: int, account_id: int = Depends(get_current_account_id))
             (user_id, account_id)
         )
         if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Topilmadi yoki sizga tegishli emas")
+            raise HTTPException(status_code=404, detail="Not found or does not belong to you")
         cursor.execute(
             "DELETE FROM users WHERE id = %s AND account_id = %s",
             (user_id, account_id)
         )
         conn.commit()
-        return {"message": "O'chirildi"}
+        return {"message": "Deleted"}
     except HTTPException:
         raise
     except Exception as e:

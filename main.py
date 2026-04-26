@@ -52,7 +52,7 @@ def create_tables():
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Ma'lumotlar bazasida xato: {e}")
+        print(f"Database error: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -83,4 +83,4 @@ async def home():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "index.html topilmadi", "path": index_path}
+    return {"message": "index.html not found", "path": index_path}
