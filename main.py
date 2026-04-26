@@ -49,23 +49,6 @@ def create_tables():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS categories (
-                id SERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                emoji TEXT,
-                description TEXT
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS budgets (
-                id SERIAL PRIMARY KEY,
-                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                month_year TEXT NOT NULL,
-                amount REAL NOT NULL,
-                UNIQUE(account_id, month_year)
-            )
-        """)
         conn.commit()
         conn.close()
     except Exception as e:

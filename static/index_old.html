@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDIS — Personal Management System</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --surface2: #1c1c26;
+      --border: #2a2a3a;
+      --accent: #6c63ff;
+      --accent2: #ff6584;
+      --green: #43e97b;
+      --text: #e8e8f0;
+      --muted: #7a7a9a;
+      --radius: 16px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: -200px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(108, 99, 255, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      display: none;
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    .page.active {
+      display: flex;
+    }
+
+    .auth-page {
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .auth-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .auth-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    .auth-subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 36px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #9b59b6);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(108, 99, 255, 0.4);
+    }
+
+    .auth-switch {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .auth-switch a {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .error-msg {
+      background: rgba(255, 101, 132, 0.1);
+      border: 1px solid rgba(255, 101, 132, 0.3);
+      color: var(--accent2);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .success-msg {
+      background: rgba(67, 233, 123, 0.1);
+      border: 1px solid rgba(67, 233, 123, 0.3);
+      color: var(--green);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .dashboard-page {
+      flex-direction: row;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 1200;
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    body.menu-open .mobile-menu-btn {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .mobile-menu-btn span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+    }
+
+    .mobile-sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1090;
+    }
+
+    .sidebar {
+      width: 260px;
+      min-height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 32px 20px;
+      flex-shrink: 0;
+      transition: transform 0.25s ease;
+    }
+
+    .sidebar-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+      padding: 0 12px;
+    }
+
+    .sidebar-user {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 0 12px;
+      margin-bottom: 32px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      transition: all 0.2s;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: rgba(108, 99, 255, 0.15);
+      color: var(--accent);
+      border-color: rgba(108, 99, 255, 0.3);
+    }
+
+    .sidebar-bottom {
+      margin-top: auto;
+    }
+
+    .logout-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--accent2);
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .logout-btn:hover {
+      background: rgba(255, 101, 132, 0.1);
+      border-color: rgba(255, 101, 132, 0.2);
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 76px 40px 40px;
+      overflow-y: auto;
+    }
+
+    .dashboard-page.sidebar-collapsed .sidebar {
+      transform: translateX(-100%);
+    }
+
+    .dashboard-page.sidebar-collapsed .main-content {
+      width: 100%;
+    }
+
+    .content-section {
+      display: none;
+    }
+
+    .content-section.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .page-header {
+      margin-bottom: 32px;
+    }
+
+    .page-header h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .page-header p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+    }
+
+    .stat-value.green {
+      color: var(--green);
+    }
+
+    .stat-value.purple {
+      color: var(--accent);
+    }
+
+    .stat-value.pink {
+      color: var(--accent2);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .inline-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .inline-form .form-group {
+      margin-bottom: 0;
+    }
+
+    .btn-add {
+      background: linear-gradient(135deg, var(--accent), #9b59b6);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-add:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(108, 99, 255, 0.4);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(42, 42, 58, 0.5);
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .btn-delete {
+      background: rgba(255, 101, 132, 0.1);
+      color: var(--accent2);
+      border: 1px solid rgba(255, 101, 132, 0.2);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-delete:hover {
+      background: rgba(255, 101, 132, 0.2);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .num-cell {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 9999;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-color: rgba(67, 233, 123, 0.4);
+      color: var(--green);
+    }
+
+    .toast.error {
+      border-color: rgba(255, 101, 132, 0.4);
+      color: var(--accent2);
+    }
+
+    .amount {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .filter-chip {
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .filter-chip.active {
+      color: var(--accent);
+      border-color: rgba(108, 99, 255, 0.35);
+      background: rgba(108, 99, 255, 0.12);
+    }
+
+    @media (max-width: 900px) {
+      .mobile-menu-btn {
+        display: flex;
+      }
+
+      .mobile-sidebar-overlay.show {
+        display: block;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: min(82vw, 300px);
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main-content {
+        width: 100%;
+        padding: 76px 16px 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- REGISTER -->
+  <div class="page auth-page" id="page-register">
+    <div class="auth-box">
+      <div class="auth-logo">PDIS</div>
+      <div class="auth-subtitle">Personal Management System — Register</div>
+      <div class="error-msg" id="reg-error"></div>
+      <div class="success-msg" id="reg-success"></div>
+      <div class="form-group">
+        <label>Ism</label>
+        <input type="text" id="reg-name" placeholder="Ismingizni kiriting" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="email@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Parol</label>
+        <input type="password" id="reg-password" placeholder="Parol kiriting" />
+      </div>
+      <button class="btn btn-primary" onclick="doRegister()">Register</button>
+      <div class="auth-switch">
+        Akkauntingiz bormi? <a onclick="showPage('page-login')">Kirish</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERIFY EMAIL -->
+  <div class="page auth-page" id="page-verify-email">
+    <div class="auth-box">
+      <div class="auth-logo">PDIS</div>
+      <div class="auth-subtitle">Email tasdiqlash</div>
+      <div class="error-msg" id="verify-error"></div>
+      <div class="success-msg" id="verify-success"></div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="verify-email" placeholder="email@example.com" />
+      </div>
+      <div class="form-group">
+        <label>6 xonali kod</label>
+        <input type="text" id="verify-code" placeholder="123456" maxlength="6" />
+      </div>
+      <button class="btn btn-primary" onclick="verifyEmailCode()">Tasdiqlash</button>
+      <div class="auth-switch">
+        Kod kelmadimi? <a id="resend-link" onclick="resendVerificationCode()">Qayta yuborish</a>
+      </div>
+      <div class="auth-switch">
+        <a onclick="showPage('page-login')">Kirish sahifasiga qaytish</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="page auth-page" id="page-login">
+    <div class="auth-box">
+      <div class="auth-logo">PDIS</div>
+      <div class="auth-subtitle">Personal Management System — Login</div>
+      <div class="error-msg" id="login-error"></div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="email@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Parol</label>
+        <input type="password" id="login-password" placeholder="Parol kiriting" />
+      </div>
+      <button class="btn btn-primary" onclick="doLogin()">Kirish</button>
+      <div class="auth-switch">
+        Don't have an account? <a onclick="showPage('page-register')">Register</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page dashboard-page" id="page-dashboard">
+    <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Menyuni ochish">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="mobile-sidebar-overlay" id="mobile-sidebar-overlay" onclick="closeSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-logo">PDIS</div>
+      <div class="sidebar-user" id="sidebar-email">user@email.com</div>
+      <nav>
+        <div class="nav-item active" onclick="showSection('home')" id="nav-home">
+          <span>🏠</span> Bosh sahifa
+        </div>
+        <div class="nav-item" onclick="showSection('users')" id="nav-users">
+          <span>👥</span> Users
+        </div>
+        <div class="nav-item" onclick="showSection('expenses')" id="nav-expenses">
+          <span>💸</span> Expenses
+        </div>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="logout-btn" onclick="doLogout()">
+          <span>🚪</span> Chiqish
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <!-- HOME -->
+      <div class="content-section active" id="section-home">
+        <div class="page-header">
+          <h1>Welcome! 👋</h1>
+          <p>Welcome to PDIS Personal Management System</p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Users</div>
+            <div class="stat-value purple" id="stat-users">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Expenses</div>
+            <div class="stat-value pink" id="stat-total">0</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 About This System</div>
+          <p style="color:var(--muted);font-size:14px;line-height:1.8">
+            This system helps you manage your users and expenses with a modern dashboard.
+            Use the navigation on the left to switch between Users and Expenses.
+          </p>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div class="content-section" id="section-users">
+        <div class="page-header">
+          <h1>👥 Users</h1>
+          <p>Add and manage your users</p>
+        </div>
+        <div class="card">
+          <div class="card-title">➕ Add New User</div>
+          <div class="inline-form">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="user-name" placeholder="First Last" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="user-email" placeholder="user@example.com" />
+            </div>
+            <button class="btn-add" onclick="addUser()">+ Add</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 List</div>
+          <div id="users-list"></div>
+        </div>
+      </div>
+
+      <!-- EXPENSES -->
+      <div class="content-section" id="section-expenses">
+        <div class="page-header">
+          <h1>💸 Expenses</h1>
+          <p>Track your expenses</p>
+        </div>
+        <div class="filter-row">
+          <button class="filter-chip active" id="filter-all" onclick="setExpenseFilter('all')">All</button>
+          <button class="filter-chip" id="filter-today" onclick="setExpenseFilter('today')">Today</button>
+          <button class="filter-chip" id="filter-week" onclick="setExpenseFilter('week')">Week</button>
+          <button class="filter-chip" id="filter-month" onclick="setExpenseFilter('month')">Month</button>
+        </div>
+        <div class="card">
+          <div class="card-title">➕ New Expense</div>
+          <div class="inline-form">
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" id="exp-category" placeholder="Food" />
+            </div>
+            <div class="form-group">
+              <label>Amount (UZS)</label>
+              <input type="number" id="exp-amount" placeholder="50000" />
+            </div>
+            <button class="btn-add" onclick="addExpense()">+ Add</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">� Byudjet</div>
+          <div class="inline-form">
+            <div class="form-group">
+              <label>Oy (YYYY-MM)</label>
+              <input type="text" id="budget-month" placeholder="2024-04" />
+            </div>
+            <div class="form-group">
+              <label>Byudjet miqdori</label>
+              <input type="number" id="budget-amount" placeholder="1000000" />
+            </div>
+            <button class="btn-add" onclick="setBudget()">Saqlash</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">�📋 Ro'yxat</div>
+          <div id="expenses-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = '';
+    let accessToken = localStorage.getItem('pdis_access') || '';
+    let refreshToken = localStorage.getItem('pdis_refresh') || '';
+    let userEmail = localStorage.getItem('pdis_email') || '';
+    let pendingVerificationEmail = localStorage.getItem('pdis_pending_verification_email') || '';
+    let resendCooldownSeconds = 0;
+    let resendCooldownInterval = null;
+    let expenseFilter = 'all';
+
+    window.onload = () => {
+      if (accessToken) {
+        showPage('page-dashboard');
+        document.getElementById('sidebar-email').textContent = userEmail;
+        loadStats();
+      } else if (pendingVerificationEmail) {
+        const verifyInput = document.getElementById('verify-email');
+        if (verifyInput) verifyInput.value = pendingVerificationEmail;
+        showPage('page-verify-email');
+      } else {
+        showPage('page-login');
+      }
+    };
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function showSection(name) {
+      document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+      document.getElementById('section-' + name).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('nav-' + name).classList.add('active');
+      closeSidebar();
+      if (name === 'users') loadUsers();
+      if (name === 'expenses') loadExpenses();
+      if (name === 'home') loadStats();
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      const isOpen = sidebar.classList.toggle('open');
+      overlay.classList.toggle('show', isOpen);
+      document.body.classList.toggle('menu-open', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+
+    function closeSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobile-sidebar-overlay');
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+      document.body.classList.remove('menu-open');
+      document.body.style.overflow = '';
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast ' + type + ' show';
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function updateResendLinkUI() {
+      const resendLink = document.getElementById('resend-link');
+      if (!resendLink) return;
+      if (resendCooldownSeconds > 0) {
+        resendLink.textContent = `Qayta yuborish (${resendCooldownSeconds}s)`;
+        resendLink.style.pointerEvents = 'none';
+        resendLink.style.opacity = '0.6';
+      } else {
+        resendLink.textContent = 'Qayta yuborish';
+        resendLink.style.pointerEvents = 'auto';
+        resendLink.style.opacity = '1';
+      }
+    }
+
+    function startResendCooldown(seconds = 60) {
+      resendCooldownSeconds = seconds;
+      updateResendLinkUI();
+      if (resendCooldownInterval) clearInterval(resendCooldownInterval);
+      resendCooldownInterval = setInterval(() => {
+        resendCooldownSeconds -= 1;
+        if (resendCooldownSeconds <= 0) {
+          resendCooldownSeconds = 0;
+          clearInterval(resendCooldownInterval);
+          resendCooldownInterval = null;
+        }
+        updateResendLinkUI();
+      }, 1000);
+    }
+
+    async function authFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      options.headers['Authorization'] = 'Bearer ' + accessToken;
+      let res = await fetch(API + url, options);
+      if (res.status === 401 && refreshToken) {
+        const refreshRes = await fetch(API + '/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken })
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          accessToken = data.access_token;
+          localStorage.setItem('pdis_access', accessToken);
+          options.headers['Authorization'] = 'Bearer ' + accessToken;
+          res = await fetch(API + url, options);
+        } else {
+          doLogout();
+          return null;
+        }
+      }
+      return res;
+    }
+
+    async function doRegister() {
+      const name = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const errEl = document.getElementById('reg-error');
+      const sucEl = document.getElementById('reg-success');
+      errEl.style.display = 'none';
+      sucEl.style.display = 'none';
+      if (!name || !email || !password) {
+        errEl.textContent = "Barcha maydonlarni to'ldiring!";
+        errEl.style.display = 'block'; return;
+      }
+      try {
+        const res = await fetch(API + '/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          pendingVerificationEmail = email;
+          localStorage.setItem('pdis_pending_verification_email', pendingVerificationEmail);
+          const verifyInput = document.getElementById('verify-email');
+          if (verifyInput) verifyInput.value = pendingVerificationEmail;
+          sucEl.textContent = "✅ Kod emailingizga yuborildi. Endi tasdiqlang.";
+          sucEl.style.display = 'block';
+          setTimeout(() => showPage('page-verify-email'), 900);
+        } else {
+          errEl.textContent = data.detail || 'Xato yuz berdi';
+          errEl.style.display = 'block';
+        }
+      } catch (e) {
+        errEl.textContent = 'Server bilan aloqa yo\'q!';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function verifyEmailCode() {
+      const emailInput = document.getElementById('verify-email');
+      const codeInput = document.getElementById('verify-code');
+      const errEl = document.getElementById('verify-error');
+      const sucEl = document.getElementById('verify-success');
+      const email = emailInput.value.trim();
+      const code = codeInput.value.trim();
+      errEl.style.display = 'none';
+      sucEl.style.display = 'none';
+
+      if (!email || !code) {
+        errEl.textContent = "Email va kodni kiriting";
+        errEl.style.display = 'block'; return;
+      }
+
+      try {
+        const res = await fetch(API + '/auth/verify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          localStorage.removeItem('pdis_pending_verification_email');
+          pendingVerificationEmail = '';
+          sucEl.textContent = "✅ Email tasdiqlandi. Endi tizimga kiring.";
+          sucEl.style.display = 'block';
+          setTimeout(() => showPage('page-login'), 1000);
+        } else {
+          errEl.textContent = data.detail || 'Tasdiqlashda xato';
+          errEl.style.display = 'block';
+        }
+      } catch (e) {
+        errEl.textContent = 'Server bilan aloqa yo\'q!';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function resendVerificationCode() {
+      if (resendCooldownSeconds > 0) return;
+      const emailInput = document.getElementById('verify-email');
+      const errEl = document.getElementById('verify-error');
+      const sucEl = document.getElementById('verify-success');
+      const email = emailInput.value.trim();
+      errEl.style.display = 'none';
+      sucEl.style.display = 'none';
+      if (!email) {
+        errEl.textContent = "Avval emailni kiriting";
+        errEl.style.display = 'block'; return;
+      }
+      try {
+        const res = await fetch(API + '/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          sucEl.textContent = "✅ Yangi kod yuborildi";
+          sucEl.style.display = 'block';
+          startResendCooldown(60);
+        } else {
+          errEl.textContent = data.detail || 'Kod yuborilmadi';
+          errEl.style.display = 'block';
+          if (res.status === 429) startResendCooldown(60);
+        }
+      } catch (e) {
+        errEl.textContent = 'Server bilan aloqa yo\'q!';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function doLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      errEl.style.display = 'none';
+      if (!email || !password) {
+        errEl.textContent = "Email va parolni kiriting!";
+        errEl.style.display = 'block'; return;
+      }
+      try {
+        const form = new URLSearchParams();
+        form.append('username', email);
+        form.append('password', password);
+        const res = await fetch(API + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form
+        });
+        const data = await res.json();
+        if (res.ok) {
+          accessToken = data.access_token;
+          refreshToken = data.refresh_token;
+          userEmail = email;
+          localStorage.setItem('pdis_access', accessToken);
+          localStorage.setItem('pdis_refresh', refreshToken);
+          localStorage.setItem('pdis_email', email);
+          document.getElementById('sidebar-email').textContent = email;
+          showPage('page-dashboard');
+          loadStats();
+          showToast('Xush kelibsiz! 👋');
+        } else {
+          if (res.status === 403) {
+            pendingVerificationEmail = email;
+            localStorage.setItem('pdis_pending_verification_email', pendingVerificationEmail);
+            const verifyInput = document.getElementById('verify-email');
+            const verifyErr = document.getElementById('verify-error');
+            if (verifyInput) verifyInput.value = pendingVerificationEmail;
+            if (verifyErr) {
+              verifyErr.textContent = data.detail || 'Email tasdiqlanmagan';
+              verifyErr.style.display = 'block';
+            }
+            showPage('page-verify-email');
+            return;
+          }
+          errEl.textContent = data.detail || 'Email yoki parol noto\'g\'ri';
+          errEl.style.display = 'block';
+        }
+      } catch (e) {
+        errEl.textContent = 'Server bilan aloqa yo\'q!';
+        errEl.style.display = 'block';
+      }
+    }
+
+    function doLogout() {
+      accessToken = ''; refreshToken = ''; userEmail = '';
+      localStorage.removeItem('pdis_access');
+      localStorage.removeItem('pdis_refresh');
+      localStorage.removeItem('pdis_email');
+      showPage('page-login');
+      showToast('Logged out!');
+    }
+
+    async function loadStats() {
+      try {
+        const [uRes, eRes] = await Promise.all([
+          authFetch('/users/'),
+          authFetch('/expenses/')
+        ]);
+        if (!uRes || !eRes) return;
+        const users = await uRes.json();
+        const exps = await eRes.json();
+        document.getElementById('stat-users').textContent = Array.isArray(users) ? users.length : 0;
+        const total = Array.isArray(exps) ? exps.reduce((s, e) => s + (e.amount || 0), 0) : 0;
+        document.getElementById('stat-total').textContent = total.toLocaleString() + " UZS";
+      } catch (e) { }
+    }
+
+    async function loadUsers() {
+      const el = document.getElementById('users-list');
+      el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
+      try {
+        const res = await authFetch('/users/');
+        if (!res) return;
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+          el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>No users added yet</div>';
+          return;
+        }
+        el.innerHTML = `<table class="data-table">
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
+        <tbody>${data.map((u, i) => `<tr>
+          <td class="num-cell">${i + 1}</td>
+          <td>${u.name}</td>
+          <td>${u.email}</td>
+          <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button></td>
+        </tr>`).join('')}</tbody></table>`;
+      } catch (e) { el.innerHTML = '<div class="empty-state">Xato yuz berdi</div>'; }
+    }
+
+    async function addUser() {
+      const name = document.getElementById('user-name').value.trim();
+      const email = document.getElementById('user-email').value.trim();
+      if (!name || !email) { showToast("Please fill all fields!", 'error'); return; }
+      try {
+        const res = await authFetch('/users/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (res.ok) {
+          showToast('✅ Qo\'shildi!');
+          document.getElementById('user-name').value = '';
+          document.getElementById('user-email').value = '';
+          loadUsers(); loadStats();
+        } else { showToast(data.detail || 'Xato!', 'error'); }
+      } catch (e) { showToast('Xato!', 'error'); }
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('O\'chirasizmi?')) return;
+      try {
+        const res = await authFetch('/users/' + id, { method: 'DELETE' });
+        if (!res) return;
+        if (res.ok) { showToast('✅ User deleted!'); loadUsers(); loadStats(); }
+        else { const d = await res.json(); showToast(d.detail || 'Xato!', 'error'); }
+      } catch (e) { showToast('Xato!', 'error'); }
+    }
+
+    async function loadExpenses() {
+      const el = document.getElementById('expenses-list');
+      el.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
+      try {
+        const res = await authFetch('/expenses/');
+        if (!res) return;
+        const data = await res.json();
+        const source = Array.isArray(data) ? data : [];
+        const filtered = source.filter(matchesExpenseFilter);
+        if (filtered.length === 0) {
+          el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>Hali xarajat qo\'shilmagan</div>';
+          return;
+        }
+        el.innerHTML = `<table class="data-table">
+        <thead><tr><th>#</th><th>Kategoriya</th><th>Miqdor</th><th>Sana</th><th>Amal</th></tr></thead>
+        <tbody>${filtered.map((e, i) => `<tr>
+          <td class="num-cell">${i + 1}</td>
+          <td>${e.category}</td>
+          <td class="amount">${e.amount.toLocaleString()} so'm</td>
+          <td style="color:var(--muted);font-size:12px">${new Date(e.created_at).toLocaleDateString('uz-UZ')}</td>
+          <td><button class="btn-delete" onclick="deleteExpense(${e.id})">🗑 O'chirish</button></td>
+        </tr>`).join('')}</tbody></table>`;
+      } catch (e) { el.innerHTML = '<div class="empty-state">Xato yuz berdi</div>'; }
+    }
+
+    function setExpenseFilter(type) {
+      expenseFilter = type;
+      document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+      const selected = document.getElementById('filter-' + type);
+      if (selected) selected.classList.add('active');
+      loadExpenses();
+    }
+
+    function matchesExpenseFilter(expense) {
+      if (expenseFilter === 'all') return true;
+      const created = new Date(expense.created_at);
+      const now = new Date();
+      if (expenseFilter === 'today') {
+        return created.toDateString() === now.toDateString();
+      }
+      if (expenseFilter === 'week') {
+        const start = new Date(now);
+        start.setDate(now.getDate() - 7);
+        return created >= start;
+      }
+      if (expenseFilter === 'month') {
+        return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+      }
+      return true;
+    }
+
+    async function addExpense() {
+      const category = document.getElementById('exp-category').value.trim();
+      const amount = parseFloat(document.getElementById('exp-amount').value);
+      if (!category || !amount) { showToast("Barcha maydonlarni to'ldiring!", 'error'); return; }
+      try {
+        const res = await authFetch('/expenses/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, amount })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (res.ok) {
+          showToast('✅ Qo\'shildi!');
+          document.getElementById('exp-category').value = '';
+          document.getElementById('exp-amount').value = '';
+          loadExpenses(); loadStats();
+        } else { showToast(data.detail || 'Xato!', 'error'); }
+      } catch (e) { showToast('Xato!', 'error'); }
+    }
+
+    async function deleteExpense(id) {
+      if (!confirm('O\'chirasizmi?')) return;
+      try {
+        const res = await authFetch('/expenses/' + id, { method: 'DELETE' });
+        if (!res) return;
+        if (res.ok) { showToast('✅ O\'chirildi!'); loadExpenses(); loadStats(); }
+        else { const d = await res.json(); showToast(d.detail || 'Xato!', 'error'); }
+      } catch (e) { showToast('Xato!', 'error'); }
+    }
+
+    function parseMonthYear(value) {
+      const trimmed = value.trim();
+      if (/^\d{4}-\d{2}$/.test(trimmed)) return trimmed;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed.slice(0, 7);
+      return null;
+    }
+
+    async function setBudget() {
+      const month = parseMonthYear(document.getElementById('budget-month').value);
+      const amount = parseFloat(document.getElementById('budget-amount').value);
+      if (!month || isNaN(amount) || amount <= 0) {
+        showToast('Please enter a valid budget month and amount.', 'error');
+        return;
+      }
+      try {
+        const res = await authFetch('/expenses/budget', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ month_year: month, amount })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('✅ Budget saved');
+          loadStats();
+        } else {
+          showToast(data.detail || 'Error saving budget', 'error');
+        }
+      } catch (e) {
+        showToast('Server error saving budget', 'error');
+      }
+    }
+
+    async function exportExpenses() {
+      try {
+        const res = await authFetch('/expenses/export/csv');
+        if (!res) return;
+        if (!res.ok) {
+          const data = await res.json();
+          showToast(data.detail || 'Export failed', 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'expenses.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('✅ CSV downloaded');
+      } catch (e) {
+        showToast('Server error exporting CSV', 'error');
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (document.getElementById('page-login').classList.contains('active')) doLogin();
+        if (document.getElementById('page-register').classList.contains('active')) doRegister();
+        if (document.getElementById('page-verify-email').classList.contains('active')) verifyEmailCode();
+      }
+      if (e.key === 'Escape') closeSidebar();
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 900) {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobile-sidebar-overlay');
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        document.body.classList.remove('menu-open');
+        document.body.style.overflow = '';
+        return;
+      }
+    });
+  </script>
+</body>
+
+</html>

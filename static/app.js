@@ -37,10 +37,7 @@ function showSection(name) {
     if (nav) nav.classList.add('active');
     closeSidebar();
     if (name === 'users') loadUsers();
-    if (name === 'expenses') {
-        loadExpenses();
-        loadCategories();
-    }
+    if (name === 'expenses') loadExpenses();
     if (name === 'home') loadStats();
 }
 
@@ -99,192 +96,154 @@ function startResendCooldown(seconds = 60) {
 }
 
 async function authFetch(url, options = {}) {
-    options.headers = options.headers || {};
-    if (accessToken) {
-        options.headers['Authorization'] = `Bearer ${accessToken}`;
+    const token = localStorage.getItem('pdis_access');
+    if (!token && !url.includes('/auth/')) {
+        showPage('page-login');
+        return null;
     }
-    let response = await fetch(API_URL + url, options);
-    if (response.status === 401 && refreshToken) {
-        const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken })
-        });
-        if (refreshRes.ok) {
-            const data = await refreshRes.json();
-            accessToken = data.access_token;
-            localStorage.setItem('pdis_token', accessToken);
-            options.headers['Authorization'] = `Bearer ${accessToken}`;
-            response = await fetch(API_URL + url, options);
-        } else {
-            doLogout();
+    const headers = options.headers || {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    try {
+        const res = await fetch(API_URL + url, { ...options, headers });
+        if (res.status === 401) {
+            localStorage.removeItem('pdis_access');
+            showPage('page-login');
             return null;
         }
+        return res;
+    } catch (e) {
+        console.error('Fetch error:', e);
+        return null;
     }
-    return response;
+}
+
+async function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+    if (!email || !password) {
+        showToast('Please fill all fields!', 'error');
+        return;
+    }
+    try {
+        const res = await fetch(API_URL + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            localStorage.setItem('pdis_access', data.access_token);
+            localStorage.setItem('pdis_refresh', data.refresh_token || '');
+            localStorage.setItem('pdis_email', email);
+            accessToken = data.access_token;
+            userEmail = email;
+            document.getElementById('login-email').value = '';
+            document.getElementById('login-password').value = '';
+            showPage('page-dashboard');
+            document.getElementById('sidebar-email').textContent = email;
+            loadStats();
+        } else {
+            const errEl = document.getElementById('login-error');
+            errEl.textContent = data.detail || 'Login failed!';
+            errEl.style.display = 'block';
+        }
+    } catch (e) {
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = 'Unable to connect to server!';
+        errEl.style.display = 'block';
+    }
 }
 
 async function doRegister() {
     const name = document.getElementById('reg-name').value.trim();
     const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
-    const errEl = document.getElementById('reg-error');
-    const sucEl = document.getElementById('reg-success');
-    errEl.style.display = 'none';
-    sucEl.style.display = 'none';
+    const password = document.getElementById('reg-password').value.trim();
     if (!name || !email || !password) {
-        errEl.textContent = 'Please fill all fields!';
-        errEl.style.display = 'block';
+        showToast('Please fill all fields!', 'error');
         return;
     }
     try {
-        const res = await fetch(`${API_URL}/auth/register`, {
+        const res = await fetch(API_URL + '/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, email, password })
         });
         const data = await res.json();
         if (res.ok) {
+            document.getElementById('reg-name').value = '';
+            document.getElementById('reg-email').value = '';
+            document.getElementById('reg-password').value = '';
+            localStorage.setItem('pdis_pending_verification_email', email);
             pendingVerificationEmail = email;
-            localStorage.setItem('pdis_pending_verification_email', pendingVerificationEmail);
-            const verifyInput = document.getElementById('verify-email');
-            if (verifyInput) verifyInput.value = pendingVerificationEmail;
-            sucEl.textContent = '✅ Verification code sent to your email.';
-            sucEl.style.display = 'block';
-            setTimeout(() => showPage('page-verify-email'), 900);
+            showPage('page-verify-email');
+            document.getElementById('verify-email').value = email;
+            startResendCooldown(60);
         } else {
-            errEl.textContent = data.detail || 'Registration error';
+            const errEl = document.getElementById('reg-error');
+            errEl.textContent = data.detail || 'Registration failed!';
             errEl.style.display = 'block';
         }
-    } catch (error) {
-        errEl.textContent = 'Unable to reach server';
+    } catch (e) {
+        const errEl = document.getElementById('reg-error');
+        errEl.textContent = 'Unable to connect to server!';
         errEl.style.display = 'block';
     }
 }
 
 async function verifyEmailCode() {
-    const emailInput = document.getElementById('verify-email');
-    const codeInput = document.getElementById('verify-code');
-    const errEl = document.getElementById('verify-error');
-    const sucEl = document.getElementById('verify-success');
-    const email = emailInput.value.trim();
-    const code = codeInput.value.trim();
-    errEl.style.display = 'none';
-    sucEl.style.display = 'none';
+    const email = document.getElementById('verify-email').value.trim();
+    const code = document.getElementById('verify-code').value.trim();
     if (!email || !code) {
-        errEl.textContent = 'Please enter email and code';
-        errEl.style.display = 'block';
+        showToast('Please fill all fields!', 'error');
         return;
     }
     try {
-        const res = await fetch(`${API_URL}/auth/verify-email`, {
+        const res = await fetch(API_URL + '/auth/verify-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, code })
         });
         const data = await res.json();
         if (res.ok) {
+            document.getElementById('verify-email').value = '';
+            document.getElementById('verify-code').value = '';
             localStorage.removeItem('pdis_pending_verification_email');
             pendingVerificationEmail = '';
-            sucEl.textContent = '✅ Email verified. Please login.';
-            sucEl.style.display = 'block';
-            setTimeout(() => showPage('page-login'), 1000);
+            showToast('✅ Email verified! You can now login.');
+            showPage('page-login');
         } else {
-            errEl.textContent = data.detail || 'Verification error';
+            const errEl = document.getElementById('verify-error');
+            errEl.textContent = data.detail || 'Verification failed!';
             errEl.style.display = 'block';
         }
-    } catch (error) {
-        errEl.textContent = 'Unable to reach server';
+    } catch (e) {
+        const errEl = document.getElementById('verify-error');
+        errEl.textContent = 'Unable to connect to server!';
         errEl.style.display = 'block';
     }
 }
 
 async function resendVerificationCode() {
-    if (resendCooldownSeconds > 0) return;
-    const emailInput = document.getElementById('verify-email');
-    const errEl = document.getElementById('verify-error');
-    const sucEl = document.getElementById('verify-success');
-    const email = emailInput.value.trim();
-    errEl.style.display = 'none';
-    sucEl.style.display = 'none';
+    const email = document.getElementById('verify-email').value.trim();
     if (!email) {
-        errEl.textContent = 'Please enter your email';
-        errEl.style.display = 'block';
+        showToast('Please enter your email!', 'error');
         return;
     }
     try {
-        const res = await fetch(`${API_URL}/auth/resend-verification`, {
+        const res = await fetch(API_URL + '/auth/resend-verification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
         });
-        const data = await res.json();
         if (res.ok) {
-            sucEl.textContent = '✅ New code sent';
-            sucEl.style.display = 'block';
+            showToast('✅ Verification code sent!');
             startResendCooldown(60);
         } else {
-            errEl.textContent = data.detail || 'Unable to resend code';
-            errEl.style.display = 'block';
-            if (res.status === 429) startResendCooldown(60);
+            const data = await res.json();
+            showToast(data.detail || 'Resend failed!', 'error');
         }
-    } catch (error) {
-        errEl.textContent = 'Unable to reach server';
-        errEl.style.display = 'block';
-    }
-}
-
-async function doLogin() {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
-    errEl.style.display = 'none';
-    if (!email || !password) {
-        errEl.textContent = 'Please enter email and password';
-        errEl.style.display = 'block';
-        return;
-    }
-    try {
-        const form = new URLSearchParams();
-        form.append('username', email);
-        form.append('password', password);
-        const res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: form
-        });
-        const data = await res.json();
-        if (res.ok) {
-            accessToken = data.access_token;
-            refreshToken = data.refresh_token;
-            userEmail = email;
-            localStorage.setItem('pdis_token', accessToken);
-            localStorage.setItem('pdis_refresh', refreshToken);
-            localStorage.setItem('pdis_email', email);
-            document.getElementById('sidebar-email').textContent = email;
-            showPage('page-dashboard');
-            loadStats();
-            showToast('Welcome! 👋');
-        } else {
-            if (res.status === 403) {
-                pendingVerificationEmail = email;
-                localStorage.setItem('pdis_pending_verification_email', pendingVerificationEmail);
-                const verifyInput = document.getElementById('verify-email');
-                const verifyErr = document.getElementById('verify-error');
-                if (verifyInput) verifyInput.value = pendingVerificationEmail;
-                if (verifyErr) {
-                    verifyErr.textContent = data.detail || 'Email not verified';
-                    verifyErr.style.display = 'block';
-                }
-                showPage('page-verify-email');
-                return;
-            }
-            errEl.textContent = data.detail || 'Login error';
-            errEl.style.display = 'block';
-        }
-    } catch (error) {
-        errEl.textContent = 'Unable to reach server';
-        errEl.style.display = 'block';
+    } catch (e) {
+        showToast('Error resending code!', 'error');
     }
 }
 
@@ -292,35 +251,25 @@ function doLogout() {
     accessToken = '';
     refreshToken = '';
     userEmail = '';
-    localStorage.removeItem('pdis_token');
+    localStorage.removeItem('pdis_access');
     localStorage.removeItem('pdis_refresh');
     localStorage.removeItem('pdis_email');
     showPage('page-login');
-    showToast('Logged out');
+    showToast('Logged out!');
 }
 
 async function loadStats() {
     try {
-        const [usersRes, expensesRes] = await Promise.all([authFetch('/users/'), authFetch('/expenses/')]);
+        const [usersRes, expensesRes] = await Promise.all([
+            authFetch('/users/'),
+            authFetch('/expenses/')
+        ]);
         if (!usersRes || !expensesRes) return;
         const users = await usersRes.json();
         const expenses = await expensesRes.json();
         document.getElementById('stat-users').textContent = Array.isArray(users) ? users.length : 0;
-        document.getElementById('stat-expenses').textContent = Array.isArray(expenses) ? expenses.length : 0;
         const total = Array.isArray(expenses) ? expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) : 0;
-        document.getElementById('stat-total').textContent = total.toLocaleString() + ' so\'m';
-
-        // Load budget for current month
-        const now = new Date();
-        const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const budgetRes = await authFetch(`/expenses/budget/${monthYear}`);
-        if (budgetRes) {
-            const budgetData = await budgetRes.json();
-            const budget = budgetData.amount || 0;
-            const remaining = budget - total;
-            document.getElementById('stat-budget').textContent = remaining.toLocaleString() + ' so\'m';
-            document.getElementById('stat-budget').className = remaining < 0 ? 'stat-value pink' : 'stat-value green';
-        }
+        document.getElementById('stat-total').textContent = total.toLocaleString() + ' UZS';
     } catch (error) {
         console.warn('Stats error', error);
     }
@@ -334,18 +283,18 @@ async function loadUsers() {
         if (!res) return;
         const data = await res.json();
         if (!Array.isArray(data) || data.length === 0) {
-            el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>No users yet</div>';
+            el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>No users added yet</div>';
             return;
         }
         el.innerHTML = `<table class="data-table">
-      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
-      <tbody>${data.map((user, index) => `<tr>
-        <td class="num-cell">${index + 1}</td>
-        <td>${user.name}</td>
-        <td>${user.email}</td>
-        <td><button class="btn-delete" onclick="deleteUser(${user.id})">🗑 Delete</button></td>
-      </tr>`).join('')}</tbody></table>`;
-    } catch (error) {
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
+        <tbody>${data.map((u, i) => `<tr>
+          <td class="num-cell">${i + 1}</td>
+          <td>${u.name}</td>
+          <td>${u.email}</td>
+          <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button></td>
+        </tr>`).join('')}</tbody></table>`;
+    } catch (e) {
         el.innerHTML = '<div class="empty-state">Error loading users</div>';
     }
 }
@@ -354,7 +303,7 @@ async function addUser() {
     const name = document.getElementById('user-name').value.trim();
     const email = document.getElementById('user-email').value.trim();
     if (!name || !email) {
-        showToast('Please enter name and email!', 'error');
+        showToast('Please fill all fields!', 'error');
         return;
     }
     try {
@@ -372,28 +321,28 @@ async function addUser() {
             loadUsers();
             loadStats();
         } else {
-            showToast(data.detail || 'Error adding user', 'error');
+            showToast(data.detail || 'Error!', 'error');
         }
-    } catch (error) {
-        showToast('Error adding user', 'error');
+    } catch (e) {
+        showToast('Error!', 'error');
     }
 }
 
 async function deleteUser(id) {
-    if (!confirm('Delete this user?')) return;
+    if (!confirm('Are you sure?')) return;
     try {
-        const res = await authFetch(`/users/${id}`, { method: 'DELETE' });
+        const res = await authFetch('/users/' + id, { method: 'DELETE' });
         if (!res) return;
         if (res.ok) {
-            showToast('✅ User deleted');
+            showToast('✅ User deleted!');
             loadUsers();
             loadStats();
         } else {
-            const data = await res.json();
-            showToast(data.detail || 'Error deleting user', 'error');
+            const d = await res.json();
+            showToast(d.detail || 'Error!', 'error');
         }
-    } catch (error) {
-        showToast('Error deleting user', 'error');
+    } catch (e) {
+        showToast('Error!', 'error');
     }
 }
 
@@ -404,30 +353,60 @@ async function loadExpenses() {
         const res = await authFetch('/expenses/');
         if (!res) return;
         const data = await res.json();
-        const items = Array.isArray(data) ? data.filter(matchesExpenseFilter) : [];
-        if (items.length === 0) {
-            el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>No expenses yet</div>';
+        const source = Array.isArray(data) ? data : [];
+        const filtered = source.filter(matchesExpenseFilter);
+        if (filtered.length === 0) {
+            el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>No expenses</div>';
             return;
         }
         el.innerHTML = `<table class="data-table">
-      <thead><tr><th>#</th><th>Category</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
-      <tbody>${items.map((expense, index) => `<tr>
-        <td class="num-cell">${index + 1}</td>
-        <td>${expense.category}</td>
-        <td class="amount">${Number(expense.amount).toLocaleString()} so\'m</td>
-        <td style="color:var(--muted);font-size:12px">${new Date(expense.created_at).toLocaleDateString()}</td>
-        <td><button class="btn-delete" onclick="deleteExpense(${expense.id})">🗑 Delete</button></td>
-      </tr>`).join('')}</tbody></table>`;
-    } catch (error) {
+        <thead><tr><th>#</th><th>Category</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody>${filtered.map((exp, i) => {
+            const date = new Date(exp.created_at).toLocaleDateString();
+            return `<tr>
+                <td class="num-cell">${i + 1}</td>
+                <td>${exp.category}</td>
+                <td class="amount">${Number(exp.amount).toLocaleString()} UZS</td>
+                <td>${date}</td>
+                <td><button class="btn-delete" onclick="deleteExpense(${exp.id})">🗑 Delete</button></td>
+            </tr>`;
+        }).join('')}</tbody></table>`;
+    } catch (e) {
         el.innerHTML = '<div class="empty-state">Error loading expenses</div>';
     }
+}
+
+function setExpenseFilter(type) {
+    expenseFilter = type;
+    document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+    const selected = document.getElementById('filter-' + type);
+    if (selected) selected.classList.add('active');
+    loadExpenses();
+}
+
+function matchesExpenseFilter(expense) {
+    if (expenseFilter === 'all') return true;
+    const created = new Date(expense.created_at);
+    const now = new Date();
+    if (expenseFilter === 'today') {
+        return created.toDateString() === now.toDateString();
+    }
+    if (expenseFilter === 'week') {
+        const start = new Date(now);
+        start.setDate(now.getDate() - 7);
+        return created >= start;
+    }
+    if (expenseFilter === 'month') {
+        return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+    }
+    return true;
 }
 
 async function addExpense() {
     const category = document.getElementById('exp-category').value.trim();
     const amount = parseFloat(document.getElementById('exp-amount').value);
-    if (!category || !amount) {
-        showToast('Please enter category and amount!', 'error');
+    if (!category || isNaN(amount) || amount <= 0) {
+        showToast('Please fill all fields!', 'error');
         return;
     }
     try {
@@ -445,141 +424,49 @@ async function addExpense() {
             loadExpenses();
             loadStats();
         } else {
-            showToast(data.detail || 'Error adding expense', 'error');
+            showToast(data.detail || 'Error!', 'error');
         }
-    } catch (error) {
-        showToast('Error adding expense', 'error');
+    } catch (e) {
+        showToast('Error!', 'error');
     }
 }
 
 async function deleteExpense(id) {
-    if (!confirm('Delete this expense?')) return;
+    if (!confirm('Are you sure?')) return;
     try {
-        const res = await authFetch(`/expenses/${id}`, { method: 'DELETE' });
+        const res = await authFetch('/expenses/' + id, { method: 'DELETE' });
         if (!res) return;
         if (res.ok) {
-            showToast('✅ Expense deleted');
+            showToast('✅ Expense deleted!');
             loadExpenses();
             loadStats();
         } else {
-            const data = await res.json();
-            showToast(data.detail || 'Error deleting expense', 'error');
+            const d = await res.json();
+            showToast(d.detail || 'Error!', 'error');
         }
-    } catch (error) {
-        showToast('Error deleting expense', 'error');
+    } catch (e) {
+        showToast('Error!', 'error');
     }
 }
 
-function parseMonthYear(value) {
-    const trimmed = value.trim();
-    const monthOnly = /^\d{4}-\d{2}$/.test(trimmed);
-    const fullDate = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
-    if (monthOnly) return trimmed;
-    if (fullDate) return trimmed.slice(0, 7);
-    return null;
-}
-
-async function setBudget() {
-    const monthValue = document.getElementById('budget-month').value.trim();
-    const amountValue = parseFloat(document.getElementById('budget-amount').value);
-    const monthYear = parseMonthYear(monthValue);
-    if (!monthYear || isNaN(amountValue) || amountValue <= 0) {
-        showToast('Please enter a valid month and budget amount.', 'error');
-        return;
-    }
-    try {
-        const res = await authFetch('/expenses/budget', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ month_year: monthYear, amount: amountValue })
-        });
-        if (!res) return;
-        const data = await res.json();
-        if (res.ok) {
-            showToast('✅ Budget saved successfully');
-            loadStats();
-        } else {
-            showToast(data.detail || 'Error saving budget', 'error');
-        }
-    } catch (error) {
-        showToast('Error saving budget', 'error');
-    }
-}
-
-async function exportExpenses() {
-    try {
-        const res = await authFetch('/expenses/export/csv');
-        if (!res) return;
-        if (!res.ok) {
-            const data = await res.json();
-            showToast(data.detail || 'Export failed', 'error');
-            return;
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'expenses.csv';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        showToast('✅ CSV exported');
-    } catch (error) {
-        showToast('Error exporting CSV', 'error');
-    }
-}
-
-function setExpenseFilter(filter) {
-    expenseFilter = filter;
-    document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.toggle('active', chip.id === `filter-${filter}`));
-    loadExpenses();
-}
-
-function matchesExpenseFilter(expense) {
-    if (expenseFilter === 'all') return true;
-    const created = new Date(expense.created_at);
-    const now = new Date();
-    if (expenseFilter === 'today') {
-        return created.toDateString() === now.toDateString();
-    }
-    if (expenseFilter === 'week') {
-        const weekAgo = new Date(now);
-        weekAgo.setDate(now.getDate() - 7);
-        return created >= weekAgo;
-    }
-    if (expenseFilter === 'month') {
-        return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
-    }
-    return true;
-}
-
-async function loadCategories() {
-    try {
-        const res = await authFetch('/expenses/categories/list');
-        if (!res) return;
-        const data = await res.json();
-        const datalist = document.getElementById('category-list');
-        if (!datalist || !Array.isArray(data)) return;
-        datalist.innerHTML = data.map(category => `<option value="${category.name}">${category.emoji} ${category.description}</option>`).join('');
-    } catch (error) {
-        console.warn('Category load error', error);
-    }
-}
-
+// Key events
 document.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
-        if (document.getElementById('page-login').classList.contains('active')) doLogin();
-        if (document.getElementById('page-register').classList.contains('active')) doRegister();
-        if (document.getElementById('page-verify-email').classList.contains('active')) verifyEmailCode();
+        if (document.getElementById('page-login')?.classList.contains('active')) doLogin();
+        if (document.getElementById('page-register')?.classList.contains('active')) doRegister();
+        if (document.getElementById('page-verify-email')?.classList.contains('active')) verifyEmailCode();
     }
-    if (e.key === 'Escape') {
-        closeSidebar();
-    }
+    if (e.key === 'Escape') closeSidebar();
 });
 
+// Handle window resize
 window.addEventListener('resize', () => {
     if (window.innerWidth > 900) {
-        closeSidebar();
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobile-sidebar-overlay');
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        document.body.classList.remove('menu-open');
+        document.body.style.overflow = '';
     }
 });
