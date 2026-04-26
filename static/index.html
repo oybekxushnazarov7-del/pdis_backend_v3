@@ -350,10 +350,6 @@
       <label>Parol</label>
       <input type="password" id="reg-password" placeholder="Parol kiriting"/>
     </div>
-    <div class="form-group">
-      <label>Parolni tasdiqlang</label>
-      <input type="password" id="reg-password-confirm" placeholder="Parolni qayta kiriting"/>
-    </div>
     <button class="btn btn-primary" onclick="doRegister()">Ro'yxatdan o'tish</button>
     <div class="auth-switch">
       Akkauntingiz bormi? <a onclick="showPage('page-login')">Kirish</a>
@@ -378,7 +374,7 @@
     </div>
     <button class="btn btn-primary" onclick="verifyEmailCode()">Tasdiqlash</button>
     <div class="auth-switch">
-      Kod kelmadimi? <a onclick="resendVerificationCode()">Qayta yuborish</a>
+      Kod kelmadimi? <a id="resend-link" onclick="resendVerificationCode()">Qayta yuborish</a>
     </div>
     <div class="auth-switch">
       <a onclick="showPage('page-login')">Kirish sahifasiga qaytish</a>
@@ -532,6 +528,8 @@
   let refreshToken = localStorage.getItem('pdis_refresh') || '';
   let userEmail = localStorage.getItem('pdis_email') || '';
   let pendingVerificationEmail = localStorage.getItem('pdis_pending_verification_email') || '';
+  let resendCooldownSeconds = 0;
+  let resendCooldownInterval = null;
   let expenseFilter = 'all';
 
   window.onload = () => {
@@ -589,6 +587,35 @@
     setTimeout(() => t.classList.remove('show'), 3000);
   }
 
+  function updateResendLinkUI() {
+    const resendLink = document.getElementById('resend-link');
+    if (!resendLink) return;
+    if (resendCooldownSeconds > 0) {
+      resendLink.textContent = `Qayta yuborish (${resendCooldownSeconds}s)`;
+      resendLink.style.pointerEvents = 'none';
+      resendLink.style.opacity = '0.6';
+    } else {
+      resendLink.textContent = 'Qayta yuborish';
+      resendLink.style.pointerEvents = 'auto';
+      resendLink.style.opacity = '1';
+    }
+  }
+
+  function startResendCooldown(seconds = 60) {
+    resendCooldownSeconds = seconds;
+    updateResendLinkUI();
+    if (resendCooldownInterval) clearInterval(resendCooldownInterval);
+    resendCooldownInterval = setInterval(() => {
+      resendCooldownSeconds -= 1;
+      if (resendCooldownSeconds <= 0) {
+        resendCooldownSeconds = 0;
+        clearInterval(resendCooldownInterval);
+        resendCooldownInterval = null;
+      }
+      updateResendLinkUI();
+    }, 1000);
+  }
+
   async function authFetch(url, options = {}) {
     options.headers = options.headers || {};
     options.headers['Authorization'] = 'Bearer ' + accessToken;
@@ -617,17 +644,12 @@
     const name = document.getElementById('reg-name').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
-    const passwordConfirm = document.getElementById('reg-password-confirm').value;
     const errEl = document.getElementById('reg-error');
     const sucEl = document.getElementById('reg-success');
     errEl.style.display = 'none';
     sucEl.style.display = 'none';
-    if (!name || !email || !password || !passwordConfirm) {
+    if (!name || !email || !password) {
       errEl.textContent = "Barcha maydonlarni to'ldiring!";
-      errEl.style.display = 'block'; return;
-    }
-    if (password !== passwordConfirm) {
-      errEl.textContent = "Parollar bir xil emas";
       errEl.style.display = 'block'; return;
     }
     try {
@@ -694,6 +716,7 @@
   }
 
   async function resendVerificationCode() {
+    if (resendCooldownSeconds > 0) return;
     const emailInput = document.getElementById('verify-email');
     const errEl = document.getElementById('verify-error');
     const sucEl = document.getElementById('verify-success');
@@ -714,9 +737,11 @@
       if (res.ok) {
         sucEl.textContent = "✅ Yangi kod yuborildi";
         sucEl.style.display = 'block';
+        startResendCooldown(60);
       } else {
         errEl.textContent = data.detail || 'Kod yuborilmadi';
         errEl.style.display = 'block';
+        if (res.status === 429) startResendCooldown(60);
       }
     } catch (e) {
       errEl.textContent = 'Server bilan aloqa yo\'q!';

@@ -95,6 +95,16 @@ def _send_verification_email(email: str, code: str) -> None:
         server.send_message(msg)
 
 
+def _send_verification_email_or_raise(email: str, code: str) -> None:
+    try:
+        _send_verification_email(email, code)
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Tasdiqlash emailini yuborib bo'lmadi. SMTP sozlamalarini tekshiring."
+        )
+
+
 def _is_strong_password(password: str) -> bool:
     if len(password) < 8:
         return False
@@ -159,7 +169,7 @@ def register(data: RegisterData):
             )
 
         conn.commit()
-        _send_verification_email(data.email, code)
+        _send_verification_email_or_raise(data.email, code)
         return {"message": "Tasdiqlash kodi emailingizga yuborildi"}
     except HTTPException:
         conn.rollback()
@@ -302,7 +312,7 @@ def resend_verification(data: ResendVerificationData):
             (code_hash, expires_at, account[0])
         )
         conn.commit()
-        _send_verification_email(data.email, code)
+        _send_verification_email_or_raise(data.email, code)
         return {"message": "Yangi tasdiqlash kodi yuborildi"}
     except HTTPException:
         conn.rollback()
