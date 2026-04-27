@@ -1,4 +1,7 @@
-const API_URL = "";
+// Auto-detect API URL based on environment
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? ''
+    : window.location.origin;
 
 let accessToken = localStorage.getItem('pdis_token') || '';
 let refreshToken = localStorage.getItem('pdis_refresh') || '';
