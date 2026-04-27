@@ -90,3 +90,7 @@ async def home():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"message": "index.html not found", "path": index_path}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
