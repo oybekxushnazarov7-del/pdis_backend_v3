@@ -813,7 +813,15 @@
                 <div class="nav-item" onclick="showSection('expenses')" id="nav-expenses">
                     <span>💸</span> Expenses
                 </div>
+                <div class="nav-item" onclick="showSection('report')" id="nav-report">
+                    <span>📊</span> Report
+                </div>
             </nav>
+            <div id="user-context-box" style="margin-top: 16px; padding: 12px; border-radius: 12px; background: rgba(67, 233, 123, 0.1); border: 1px solid rgba(67, 233, 123, 0.2); display: none;">
+                <div style="font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Active Context</div>
+                <div id="active-user-name" style="font-size: 14px; font-weight: 700; color: var(--green);">Main Account</div>
+                <button onclick="clearUserSelection()" style="background: none; border: none; color: var(--accent2); font-size: 11px; cursor: pointer; padding: 0; margin-top: 4px; text-decoration: underline;">Clear Selection</button>
+            </div>
             <div class="sidebar-bottom">
                 <button class="theme-toggle" onclick="toggleTheme()">
                     <span id="theme-icon">🌙</span> <span id="theme-text">Dark</span>
@@ -931,6 +939,24 @@
                             onkeyup="filterExpenses()" />
                     </div>
                     <div id="expenses-list"></div>
+                </div>
+            </div>
+
+            <!-- REPORT -->
+            <div class="content-section" id="section-report">
+                <div class="page-header">
+                    <h1>📊 Unified Report</h1>
+                    <p>Compare spending across all users</p>
+                </div>
+                <div class="card">
+                    <div class="card-title">👥 Spending by User</div>
+                    <div class="chart-container" style="height: 350px;">
+                        <canvas id="userCompareChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">📋 Summary Table</div>
+                    <div id="report-summary-list"></div>
                 </div>
             </div>
         </div>

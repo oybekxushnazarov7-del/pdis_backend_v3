@@ -11,6 +11,9 @@ let allUsers = [];
 let allExpenses = [];
 let trendChart = null;
 let categoryChart = null;
+let userCompareChart = null;
+let selectedUserId = null;
+let selectedUserName = null;
 
 // Theme management
 function toggleTheme() {
@@ -70,6 +73,7 @@ function showSection(name) {
     if (name === 'users') loadUsers();
     if (name === 'expenses') { loadExpenses(); loadCategoryStats(); loadCategories(); }
     if (name === 'home') loadStats();
+    if (name === 'report') loadReport();
 }
 
 function toggleSidebar() {
@@ -325,9 +329,10 @@ function doLogout() {
 // Dashboard Statistics and Charts
 async function loadStats() {
     try {
+        const query = selectedUserId ? `?user_id=${selectedUserId}` : '';
         const [usersRes, expensesRes] = await Promise.all([
             authFetch('/users/'),
-            authFetch('/expenses/')
+            authFetch('/expenses/' + query)
         ]);
         if (!usersRes || !expensesRes) return;
 
@@ -467,7 +472,10 @@ async function loadUsers() {
                 <td class="num-cell">${i + 1}</td>
                 <td>${u.name}</td>
                 <td>${u.email}</td>
-                <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button></td>
+                <td>
+                    <button class="export-btn" style="background: rgba(67, 233, 123, 0.1); color: var(--green); border-color: rgba(67, 233, 123, 0.2);" onclick="selectUser(${u.id}, '${u.name}')">🎯 Select</button>
+                    <button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button>
+                </td>
             </tr>`).join('')}</tbody>
         </table>`;
         el.innerHTML = html;
@@ -547,7 +555,8 @@ async function loadExpenses() {
     const el = document.getElementById('expenses-list');
     el.innerHTML = '<div class="empty-state">Loading...</div>';
     try {
-        const res = await authFetch('/expenses/');
+        const query = selectedUserId ? `?user_id=${selectedUserId}` : '';
+        const res = await authFetch('/expenses/' + query);
         if (!res) return;
         allExpenses = await res.json();
         if (!Array.isArray(allExpenses)) allExpenses = [];
@@ -666,7 +675,7 @@ async function addExpense() {
         const res = await authFetch('/expenses/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ category, amount })
+            body: JSON.stringify({ category, amount, user_id: selectedUserId })
         });
         if (!res) return;
         const data = await res.json();
@@ -750,3 +759,112 @@ window.addEventListener('resize', () => {
         document.body.style.overflow = '';
     }
 });
+
+// User Selection Context Logic
+function selectUser(id, name) {
+    selectedUserId = id;
+    selectedUserName = name;
+    
+    // Update UI
+    const contextBox = document.getElementById('user-context-box');
+    const activeUserName = document.getElementById('active-user-name');
+    
+    if (contextBox && activeUserName) {
+        contextBox.style.display = 'block';
+        activeUserName.textContent = name;
+    }
+    
+    showToast(`🎯 Switched to: ${name}`);
+    showSection('home');
+}
+
+function clearUserSelection() {
+    selectedUserId = null;
+    selectedUserName = null;
+    
+    const contextBox = document.getElementById('user-context-box');
+    if (contextBox) contextBox.style.display = 'none';
+    
+    showToast('🔙 Back to Main Account');
+    showSection('home');
+}
+
+// Report Logic
+async function loadReport() {
+    const el = document.getElementById('report-summary-list');
+    el.innerHTML = '<div class="empty-state">Loading report...</div>';
+    
+    try {
+        const res = await authFetch('/expenses/report/summary');
+        if (!res) return;
+        const summary = await res.json();
+        
+        if (!summary || summary.length === 0) {
+            el.innerHTML = '<div class="empty-state">No data for report</div>';
+            return;
+        }
+        
+        // Render Table
+        el.innerHTML = `
+            <table class="data-table">
+                <thead><tr><th>User</th><th>Total Expenses</th></tr></thead>
+                <tbody>
+                    ${summary.map(s => `
+                        <tr>
+                            <td style="font-weight: 600;">${s.user_name}</td>
+                            <td class="amount">${Number(s.total_amount).toLocaleString()} UZS</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        // Render Chart
+        updateUserCompareChart(summary);
+        
+    } catch (e) {
+        el.innerHTML = '<div class="empty-state">Error loading report</div>';
+    }
+}
+
+function updateUserCompareChart(summary) {
+    const ctx = document.getElementById('userCompareChart');
+    if (!ctx) return;
+    
+    const labels = summary.map(s => s.user_name);
+    const data = summary.map(s => s.total_amount);
+    const colors = ['#6c63ff', '#ff6584', '#43e97b', '#f1ab86', '#a8e6cf', '#ffd3b6', '#ffaaa5'];
+    
+    if (userCompareChart) userCompareChart.destroy();
+    
+    userCompareChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Expenses (UZS)',
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    ticks: { color: '#7a7a9a' },
+                    grid: { color: '#2a2a3a' }
+                },
+                x: { 
+                    ticks: { color: '#7a7a9a' },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
