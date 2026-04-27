@@ -61,13 +61,21 @@ def create_tables():
             CREATE TABLE IF NOT EXISTS expenses (
                 id SERIAL PRIMARY KEY,
                 account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 amount REAL NOT NULL,
                 category TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        cursor.execute("ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+        # Update existing constraint to CASCADE
+        try:
+            # We try to drop and recreate the constraint to ensure it's CASCADE
+            cursor.execute("ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_user_id_fkey")
+            cursor.execute("ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER")
+            cursor.execute("ALTER TABLE expenses ADD CONSTRAINT expenses_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE")
+        except Exception:
+            # Fallback if constraint name is different or other issues
+            cursor.execute("ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE")
         conn.commit()
         conn.close()
     except Exception as e:

@@ -1,4 +1,5 @@
 const API_URL = window.location.origin;
+console.log("Connecting to API at:", API_URL);
 
 let accessToken = localStorage.getItem('finpulse_access') || '';
 let refreshToken = localStorage.getItem('finpulse_refresh') || '';
@@ -882,4 +883,16 @@ function updateUserCompareChart(summary) {
             }
         }
     });
+}
+
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const btn = input.nextElementSibling;
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '👓';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+    }
 }

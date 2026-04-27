@@ -398,12 +398,16 @@ def delete_user(user_id: int, account_id: int = Depends(get_current_account_id))
         )
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="Not found or does not belong to you")
+        # 1. Manual cleanup of user's expenses (Double insurance)
+        cursor.execute("DELETE FROM expenses WHERE user_id = %s AND account_id = %s", (user_id, account_id))
+        
+        # 2. Delete the user
         cursor.execute(
             "DELETE FROM users WHERE id = %s AND account_id = %s",
             (user_id, account_id)
         )
         conn.commit()
-        return {"message": "Deleted"}
+        return {"message": "User and their expenses deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
