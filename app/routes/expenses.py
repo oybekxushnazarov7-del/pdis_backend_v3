@@ -1,7 +1,7 @@
 import psycopg2
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.db import get_connection
-from app.auth import oauth2_scheme, decode_token
+from app.auth import decode_token
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
@@ -19,7 +19,12 @@ class CategoryResponse(BaseModel):
     description: str
 
 
-def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
+def get_current_account_id(request: Request) -> int:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    token = auth_header.split(" ")[1]
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

@@ -6,13 +6,12 @@ import random
 import smtplib
 from email.message import EmailMessage
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.db import get_connection
 from app.auth import (
     get_hash, verify,
     create_access_token, create_refresh_token,
-    oauth2_scheme, decode_token
+    decode_token
 )
 from pydantic import BaseModel, EmailStr
 
@@ -40,11 +39,21 @@ class UserCreate(BaseModel):
     email: EmailStr
 
 
+class LoginData(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
 
-def get_current_account_id(token: str = Depends(oauth2_scheme)) -> int:
+def get_current_account_id(request: Request) -> int:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    token = auth_header.split(" ")[1]
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -182,18 +191,18 @@ def register(data: RegisterData):
 
 
 @auth_router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+def login(data: LoginData):
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, name, email, password FROM accounts WHERE email = %s",
-            (form_data.username,)
+            (data.email,)
         )
         account = cursor.fetchone()
         if not account:
             raise HTTPException(status_code=400, detail="User not found")
-        if not verify(form_data.password, account[3]):
+        if not verify(data.password, account[3]):
             raise HTTPException(status_code=400, detail="Incorrect password")
         cursor.execute(
             "SELECT email_verified FROM accounts WHERE id = %s",
