@@ -1,7 +1,5 @@
 // Auto-detect API URL based on environment
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? ''
-    : window.location.origin;
+const API_URL = ''; // Use relative paths since frontend is served by backend
 
 let accessToken = localStorage.getItem('pdis_token') || '';
 let refreshToken = localStorage.getItem('pdis_refresh') || '';
@@ -71,7 +69,7 @@ function showSection(name) {
     if (nav) nav.classList.add('active');
     closeSidebar();
     if (name === 'users') loadUsers();
-    if (name === 'expenses') { loadExpenses(); loadCategoryStats(); }
+    if (name === 'expenses') { loadExpenses(); loadCategoryStats(); loadCategories(); }
     if (name === 'home') loadStats();
 }
 
@@ -130,7 +128,7 @@ function startResendCooldown(seconds = 60) {
 }
 
 async function authFetch(url, options = {}) {
-    const token = localStorage.getItem('pdis_access');
+    let token = localStorage.getItem('pdis_access');
     if (!token && !url.includes('/auth/')) {
         showPage('page-login');
         return null;
@@ -138,9 +136,34 @@ async function authFetch(url, options = {}) {
     const headers = options.headers || {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
-        const res = await fetch(API_URL + url, { ...options, headers });
-        if (res.status === 401) {
+        let res = await fetch(API_URL + url, { ...options, headers });
+        
+        // If 401, try to refresh token
+        if (res.status === 401 && !url.includes('/auth/refresh')) {
+            const refreshToken = localStorage.getItem('pdis_refresh');
+            if (refreshToken) {
+                const refreshRes = await fetch(API_URL + '/auth/refresh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refresh_token: refreshToken })
+                });
+                
+                if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    localStorage.setItem('pdis_access', data.access_token);
+                    accessToken = data.access_token;
+                    
+                    // Retry original request
+                    headers['Authorization'] = `Bearer ${data.access_token}`;
+                    return await fetch(API_URL + url, { ...options, headers });
+                }
+            }
+            
+            // If refresh fails or no refresh token, logout
             localStorage.removeItem('pdis_access');
+            localStorage.removeItem('pdis_refresh');
+            accessToken = '';
+            refreshToken = '';
             showPage('page-login');
             return null;
         }
@@ -159,10 +182,14 @@ async function doLogin() {
         return;
     }
     try {
+        const formData = new URLSearchParams();
+        formData.append('username', email);
+        formData.append('password', password);
+
         const res = await fetch(API_URL + '/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
         });
         const data = await res.json();
         if (res.ok) {
@@ -178,7 +205,9 @@ async function doLogin() {
             loadStats();
         } else {
             const errEl = document.getElementById('login-error');
-            errEl.textContent = data.detail || 'Login failed!';
+            let errorText = data.detail;
+            if (typeof errorText === 'object') errorText = JSON.stringify(errorText);
+            errEl.textContent = errorText || 'Login failed!';
             errEl.style.display = 'block';
         }
     } catch (e) {
@@ -214,7 +243,9 @@ async function doRegister() {
             startResendCooldown(60);
         } else {
             const errEl = document.getElementById('reg-error');
-            errEl.textContent = data.detail || 'Registration failed!';
+            let errorText = data.detail;
+            if (typeof errorText === 'object') errorText = JSON.stringify(errorText);
+            errEl.textContent = errorText || 'Registration failed!';
             errEl.style.display = 'block';
         }
     } catch (e) {
@@ -247,7 +278,9 @@ async function verifyEmailCode() {
             showPage('page-login');
         } else {
             const errEl = document.getElementById('verify-error');
-            errEl.textContent = data.detail || 'Verification failed!';
+            let errorText = data.detail;
+            if (typeof errorText === 'object') errorText = JSON.stringify(errorText);
+            errEl.textContent = errorText || 'Verification failed!';
             errEl.style.display = 'block';
         }
     } catch (e) {
@@ -274,7 +307,9 @@ async function resendVerificationCode() {
             startResendCooldown(60);
         } else {
             const data = await res.json();
-            showToast(data.detail || 'Resend failed!', 'error');
+            let errorText = data.detail;
+            if (typeof errorText === 'object') errorText = JSON.stringify(errorText);
+            showToast(errorText || 'Resend failed!', 'error');
         }
     } catch (e) {
         showToast('Error resending code!', 'error');
@@ -605,6 +640,24 @@ async function loadCategoryStats() {
             <div class="category-amount">${total.toLocaleString()} UZS</div>
         </div>
     `).join('');
+}
+
+async function loadCategories() {
+    const select = document.getElementById('exp-category');
+    if (!select) return;
+    try {
+        const res = await authFetch('/expenses/categories/list');
+        if (!res) return;
+        const categories = await res.json();
+        if (Array.isArray(categories)) {
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">Select category...</option>' + 
+                categories.map(c => `<option value="${c.name}">${c.emoji} ${c.name}</option>`).join('');
+            if (currentVal) select.value = currentVal;
+        }
+    } catch (e) {
+        console.warn('Error loading categories', e);
+    }
 }
 
 async function addExpense() {
