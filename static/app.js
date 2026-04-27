@@ -62,7 +62,7 @@ function showPage(id) {
     if (page) page.classList.add('active');
 }
 
-function showSection(name) {
+async function showSection(name) {
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
     const section = document.getElementById('section-' + name);
     if (section) section.classList.add('active');
@@ -70,10 +70,15 @@ function showSection(name) {
     const nav = document.getElementById('nav-' + name);
     if (nav) nav.classList.add('active');
     closeSidebar();
-    if (name === 'users') loadUsers();
-    if (name === 'expenses') { loadExpenses(); loadCategoryStats(); loadCategories(); }
-    if (name === 'home') loadStats();
-    if (name === 'report') loadReport();
+    
+    if (name === 'users') await loadUsers();
+    if (name === 'expenses') { 
+        await loadExpenses(); 
+        loadCategoryStats(); 
+        await loadCategories(); 
+    }
+    if (name === 'home') await loadStats();
+    if (name === 'report') await loadReport();
 }
 
 function toggleSidebar() {
@@ -418,6 +423,16 @@ function updateCategoryChart() {
     const ctx = document.getElementById('categoryChart');
     if (!ctx) return;
 
+    if (allExpenses.length === 0) {
+        if (categoryChart) categoryChart.destroy();
+        // Show empty message in chart container
+        const container = ctx.parentElement;
+        if (container) {
+            container.innerHTML = '<canvas id="categoryChart"></canvas><div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px;">No data for this user</div>';
+        }
+        return;
+    }
+
     const categories = {};
     allExpenses.forEach(exp => {
         const cat = exp.category || 'Other';
@@ -553,14 +568,14 @@ function exportUsersToCSV() {
 // Expenses Section
 async function loadExpenses() {
     const el = document.getElementById('expenses-list');
+    if (!el) return;
     el.innerHTML = '<div class="empty-state">Loading...</div>';
     try {
         const query = selectedUserId ? `?user_id=${selectedUserId}` : '';
         const res = await authFetch('/expenses/' + query);
         if (!res) return;
-        allExpenses = await res.json();
-        if (!Array.isArray(allExpenses)) allExpenses = [];
-
+        const data = await res.json();
+        allExpenses = Array.isArray(data) ? data : [];
         renderExpensesTable(el, allExpenses);
     } catch (e) {
         el.innerHTML = '<div class="empty-state">Error loading expenses</div>';
