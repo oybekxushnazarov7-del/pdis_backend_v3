@@ -7,8 +7,39 @@ let pendingVerificationEmail = localStorage.getItem('pdis_pending_verification_e
 let resendCooldownSeconds = 0;
 let resendCooldownInterval = null;
 let expenseFilter = 'all';
+let allUsers = [];
+let allExpenses = [];
+let trendChart = null;
+let categoryChart = null;
+
+// Theme management
+function toggleTheme() {
+    const body = document.body;
+    const isDark = body.classList.contains('light-mode');
+    if (isDark) {
+        body.classList.remove('light-mode');
+        localStorage.setItem('pdis_theme', 'dark');
+        document.getElementById('theme-icon').textContent = '🌙';
+        document.getElementById('theme-text').textContent = 'Dark';
+    } else {
+        body.classList.add('light-mode');
+        localStorage.setItem('pdis_theme', 'light');
+        document.getElementById('theme-icon').textContent = '☀️';
+        document.getElementById('theme-text').textContent = 'Light';
+    }
+}
+
+function initTheme() {
+    const theme = localStorage.getItem('pdis_theme') || 'dark';
+    if (theme === 'light') {
+        document.body.classList.add('light-mode');
+        document.getElementById('theme-icon').textContent = '☀️';
+        document.getElementById('theme-text').textContent = 'Light';
+    }
+}
 
 window.onload = () => {
+    initTheme();
     if (accessToken) {
         showPage('page-dashboard');
         document.getElementById('sidebar-email').textContent = userEmail;
@@ -37,7 +68,7 @@ function showSection(name) {
     if (nav) nav.classList.add('active');
     closeSidebar();
     if (name === 'users') loadUsers();
-    if (name === 'expenses') loadExpenses();
+    if (name === 'expenses') { loadExpenses(); loadCategoryStats(); }
     if (name === 'home') loadStats();
 }
 
@@ -255,9 +286,10 @@ function doLogout() {
     localStorage.removeItem('pdis_refresh');
     localStorage.removeItem('pdis_email');
     showPage('page-login');
-    showToast('Logged out!');
+    showToast('Logged out successfully!');
 }
 
+// Dashboard Statistics and Charts
 async function loadStats() {
     try {
         const [usersRes, expensesRes] = await Promise.all([
@@ -265,38 +297,159 @@ async function loadStats() {
             authFetch('/expenses/')
         ]);
         if (!usersRes || !expensesRes) return;
-        const users = await usersRes.json();
-        const expenses = await expensesRes.json();
-        document.getElementById('stat-users').textContent = Array.isArray(users) ? users.length : 0;
-        const total = Array.isArray(expenses) ? expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) : 0;
+
+        allUsers = await usersRes.json();
+        allExpenses = await expensesRes.json();
+
+        if (!Array.isArray(allUsers)) allUsers = [];
+        if (!Array.isArray(allExpenses)) allExpenses = [];
+
+        const total = allExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthExpenses = allExpenses.filter(exp => new Date(exp.created_at) >= monthStart);
+        const monthTotal = monthExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+        document.getElementById('stat-users').textContent = allUsers.length;
         document.getElementById('stat-total').textContent = total.toLocaleString() + ' UZS';
+        document.getElementById('stat-month').textContent = monthTotal.toLocaleString() + ' UZS';
+
+        updateCharts();
     } catch (error) {
         console.warn('Stats error', error);
     }
 }
 
+function updateCharts() {
+    updateTrendChart();
+    updateCategoryChart();
+}
+
+function updateTrendChart() {
+    const ctx = document.getElementById('trendChart');
+    if (!ctx) return;
+
+    const months = [];
+    const data = [];
+    for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        months.push(monthName);
+
+        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        const monthExpenses = allExpenses.filter(exp => {
+            const expDate = new Date(exp.created_at);
+            return expDate >= monthStart && expDate <= monthEnd;
+        });
+        const total = monthExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        data.push(total);
+    }
+
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Monthly Expenses (UZS)',
+                data: data,
+                borderColor: '#6c63ff',
+                backgroundColor: 'rgba(108, 99, 255, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#6c63ff',
+                pointBorderColor: '#fff',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { color: '#7a7a9a' }, grid: { color: '#2a2a3a' } },
+                x: { ticks: { color: '#7a7a9a' }, grid: { color: '#2a2a3a' } }
+            }
+        }
+    });
+}
+
+function updateCategoryChart() {
+    const ctx = document.getElementById('categoryChart');
+    if (!ctx) return;
+
+    const categories = {};
+    allExpenses.forEach(exp => {
+        const cat = exp.category || 'Other';
+        categories[cat] = (categories[cat] || 0) + Number(exp.amount);
+    });
+
+    const labels = Object.keys(categories);
+    const data = Object.values(categories);
+    const colors = ['#6c63ff', '#ff6584', '#43e97b', '#f1ab86', '#a8e6cf', '#ffd3b6', '#ffaaa5'];
+
+    if (categoryChart) categoryChart.destroy();
+    categoryChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length)
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#e8e8f0' }
+                }
+            }
+        }
+    });
+}
+
+// Users Section
 async function loadUsers() {
     const el = document.getElementById('users-list');
     el.innerHTML = '<div class="empty-state">Loading...</div>';
     try {
         const res = await authFetch('/users/');
         if (!res) return;
-        const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
+        allUsers = await res.json();
+        if (!Array.isArray(allUsers)) allUsers = [];
+
+        if (allUsers.length === 0) {
             el.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div>No users added yet</div>';
             return;
         }
-        el.innerHTML = `<table class="data-table">
-        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
-        <tbody>${data.map((u, i) => `<tr>
-          <td class="num-cell">${i + 1}</td>
-          <td>${u.name}</td>
-          <td>${u.email}</td>
-          <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button></td>
-        </tr>`).join('')}</tbody></table>`;
+
+        const html = `<table class="data-table">
+            <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
+            <tbody id="users-tbody">${allUsers.map((u, i) => `<tr class="user-row" data-email="${u.email}">
+                <td class="num-cell">${i + 1}</td>
+                <td>${u.name}</td>
+                <td>${u.email}</td>
+                <td><button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button></td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+        el.innerHTML = html;
     } catch (e) {
         el.innerHTML = '<div class="empty-state">Error loading users</div>';
     }
+}
+
+function filterUsers() {
+    const search = document.getElementById('user-search').value.toLowerCase();
+    const rows = document.querySelectorAll('.user-row');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(search) ? '' : 'none';
+    });
 }
 
 async function addUser() {
@@ -315,7 +468,7 @@ async function addUser() {
         if (!res) return;
         const data = await res.json();
         if (res.ok) {
-            showToast('✅ User added!');
+            showToast('✅ User added successfully!');
             document.getElementById('user-name').value = '';
             document.getElementById('user-email').value = '';
             loadUsers();
@@ -329,12 +482,12 @@ async function addUser() {
 }
 
 async function deleteUser(id) {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm('Are you sure you want to delete this user?')) return;
     try {
         const res = await authFetch('/users/' + id, { method: 'DELETE' });
         if (!res) return;
         if (res.ok) {
-            showToast('✅ User deleted!');
+            showToast('✅ User deleted successfully!');
             loadUsers();
             loadStats();
         } else {
@@ -346,34 +499,60 @@ async function deleteUser(id) {
     }
 }
 
+function exportUsersToCSV() {
+    if (allUsers.length === 0) {
+        showToast('No users to export!', 'error');
+        return;
+    }
+    const csv = 'Name,Email\n' + allUsers.map(u => `${u.name},${u.email}`).join('\n');
+    downloadCSV(csv, 'users.csv');
+    showToast('✅ Users exported to CSV!');
+}
+
+// Expenses Section
 async function loadExpenses() {
     const el = document.getElementById('expenses-list');
     el.innerHTML = '<div class="empty-state">Loading...</div>';
     try {
         const res = await authFetch('/expenses/');
         if (!res) return;
-        const data = await res.json();
-        const source = Array.isArray(data) ? data : [];
-        const filtered = source.filter(matchesExpenseFilter);
-        if (filtered.length === 0) {
-            el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>No expenses</div>';
-            return;
-        }
-        el.innerHTML = `<table class="data-table">
+        allExpenses = await res.json();
+        if (!Array.isArray(allExpenses)) allExpenses = [];
+
+        renderExpensesTable(el, allExpenses);
+    } catch (e) {
+        el.innerHTML = '<div class="empty-state">Error loading expenses</div>';
+    }
+}
+
+function renderExpensesTable(el, expenses) {
+    const filtered = expenses.filter(matchesExpenseFilter);
+    if (filtered.length === 0) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">💸</div>No expenses</div>';
+        return;
+    }
+    el.innerHTML = `<table class="data-table">
         <thead><tr><th>#</th><th>Category</th><th>Amount</th><th>Date</th><th>Action</th></tr></thead>
-        <tbody>${filtered.map((exp, i) => {
-            const date = new Date(exp.created_at).toLocaleDateString();
-            return `<tr>
+        <tbody id="expenses-tbody">${filtered.map((exp, i) => {
+        const date = new Date(exp.created_at).toLocaleDateString();
+        return `<tr class="expense-row" data-category="${exp.category.toLowerCase()}">
                 <td class="num-cell">${i + 1}</td>
                 <td>${exp.category}</td>
                 <td class="amount">${Number(exp.amount).toLocaleString()} UZS</td>
                 <td>${date}</td>
                 <td><button class="btn-delete" onclick="deleteExpense(${exp.id})">🗑 Delete</button></td>
             </tr>`;
-        }).join('')}</tbody></table>`;
-    } catch (e) {
-        el.innerHTML = '<div class="empty-state">Error loading expenses</div>';
-    }
+    }).join('')}</tbody>
+    </table>`;
+}
+
+function filterExpenses() {
+    const search = document.getElementById('expense-search').value.toLowerCase();
+    const rows = document.querySelectorAll('.expense-row');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(search) ? '' : 'none';
+    });
 }
 
 function setExpenseFilter(type) {
@@ -402,11 +581,34 @@ function matchesExpenseFilter(expense) {
     return true;
 }
 
+async function loadCategoryStats() {
+    const container = document.getElementById('category-stats');
+    if (!container) return;
+
+    const categories = {};
+    allExpenses.forEach(exp => {
+        const cat = exp.category || 'Other';
+        categories[cat] = (categories[cat] || 0) + Number(exp.amount);
+    });
+
+    if (Object.keys(categories).length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--muted);">No expenses to analyze</div>';
+        return;
+    }
+
+    container.innerHTML = Object.entries(categories).map(([cat, total]) => `
+        <div class="category-stat">
+            <div class="category-name">${cat}</div>
+            <div class="category-amount">${total.toLocaleString()} UZS</div>
+        </div>
+    `).join('');
+}
+
 async function addExpense() {
     const category = document.getElementById('exp-category').value.trim();
     const amount = parseFloat(document.getElementById('exp-amount').value);
     if (!category || isNaN(amount) || amount <= 0) {
-        showToast('Please fill all fields!', 'error');
+        showToast('Please fill all fields correctly!', 'error');
         return;
     }
     try {
@@ -418,10 +620,11 @@ async function addExpense() {
         if (!res) return;
         const data = await res.json();
         if (res.ok) {
-            showToast('✅ Expense added!');
+            showToast('✅ Expense added successfully!');
             document.getElementById('exp-category').value = '';
             document.getElementById('exp-amount').value = '';
             loadExpenses();
+            loadCategoryStats();
             loadStats();
         } else {
             showToast(data.detail || 'Error!', 'error');
@@ -432,13 +635,14 @@ async function addExpense() {
 }
 
 async function deleteExpense(id) {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm('Are you sure you want to delete this expense?')) return;
     try {
         const res = await authFetch('/expenses/' + id, { method: 'DELETE' });
         if (!res) return;
         if (res.ok) {
-            showToast('✅ Expense deleted!');
+            showToast('✅ Expense deleted successfully!');
             loadExpenses();
+            loadCategoryStats();
             loadStats();
         } else {
             const d = await res.json();
@@ -447,6 +651,31 @@ async function deleteExpense(id) {
     } catch (e) {
         showToast('Error!', 'error');
     }
+}
+
+function exportExpensesToCSV() {
+    if (allExpenses.length === 0) {
+        showToast('No expenses to export!', 'error');
+        return;
+    }
+    const csv = 'Category,Amount,Date\n' + allExpenses.map(exp => {
+        const date = new Date(exp.created_at).toLocaleDateString();
+        return `${exp.category},${exp.amount},${date}`;
+    }).join('\n');
+    downloadCSV(csv, 'expenses.csv');
+    showToast('✅ Expenses exported to CSV!');
+}
+
+function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
 }
 
 // Key events

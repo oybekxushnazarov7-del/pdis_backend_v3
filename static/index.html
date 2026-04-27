@@ -8,6 +8,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
         rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg: #0a0a0f;
@@ -20,6 +21,18 @@
             --text: #e8e8f0;
             --muted: #7a7a9a;
             --radius: 16px;
+        }
+
+        body.light-mode {
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --surface2: #f0f1f3;
+            --border: #e0e0e5;
+            --accent: #6c63ff;
+            --accent2: #ff6584;
+            --green: #2ecc71;
+            --text: #1a1a1a;
+            --muted: #7a7a9a;
         }
 
         * {
@@ -297,6 +310,31 @@
 
         .sidebar-bottom {
             margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--muted);
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .theme-toggle:hover {
+            background: var(--surface2);
+            color: var(--text);
         }
 
         .logout-btn {
@@ -316,6 +354,75 @@
         .logout-btn:hover {
             background: rgba(255, 101, 132, 0.1);
             border-color: rgba(255, 101, 132, 0.2);
+        }
+
+        .export-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(108, 99, 255, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(108, 99, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-right: 8px;
+        }
+
+        .export-btn:hover {
+            background: rgba(108, 99, 255, 0.2);
+        }
+
+        .search-box {
+            width: 100%;
+            max-width: 300px;
+            padding: 10px 14px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .search-box::placeholder {
+            color: var(--muted);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 24px;
+        }
+
+        .category-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .category-stat {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .category-name {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .category-amount {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
         }
 
         .main-content {
@@ -708,6 +815,9 @@
                 </div>
             </nav>
             <div class="sidebar-bottom">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span> <span id="theme-text">Dark</span>
+                </button>
                 <div class="logout-btn" onclick="doLogout()">
                     <span>🚪</span> Logout
                 </div>
@@ -719,24 +829,33 @@
             <div class="content-section active" id="section-home">
                 <div class="page-header">
                     <h1>Welcome! 👋</h1>
-                    <p>Welcome to PDIS Personal Management System</p>
+                    <p>Your Personal Management System Dashboard</p>
                 </div>
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-label">Users</div>
+                        <div class="stat-label">Total Users</div>
                         <div class="stat-value purple" id="stat-users">0</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Total Expenses</div>
-                        <div class="stat-value pink" id="stat-total">0</div>
+                        <div class="stat-value pink" id="stat-total">0 UZS</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">This Month</div>
+                        <div class="stat-value green" id="stat-month">0 UZS</div>
                     </div>
                 </div>
                 <div class="card">
-                    <div class="card-title">📊 About This System</div>
-                    <p style="color:var(--muted);font-size:14px;line-height:1.8">
-                        This system helps you manage your users and expenses with a modern dashboard.
-                        Use the navigation on the left to switch between Users and Expenses sections.
-                    </p>
+                    <div class="card-title">📊 Monthly Expense Trend</div>
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">💰 Expense Breakdown by Category</div>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -761,7 +880,12 @@
                     </div>
                 </div>
                 <div class="card">
-                    <div class="card-title">📋 List</div>
+                    <div class="card-title">📋 Users List</div>
+                    <div style="margin-bottom: 16px;">
+                        <button class="export-btn" onclick="exportUsersToCSV()">📥 Export CSV</button>
+                        <input type="text" id="user-search" class="search-box" placeholder="Search users..."
+                            onkeyup="filterUsers()" />
+                    </div>
                     <div id="users-list"></div>
                 </div>
             </div>
@@ -770,16 +894,21 @@
             <div class="content-section" id="section-expenses">
                 <div class="page-header">
                     <h1>💸 Expenses</h1>
-                    <p>Track your expenses</p>
+                    <p>Track and analyze your expenses</p>
+                </div>
+                <div class="card">
+                    <div class="card-title">📊 Category Statistics</div>
+                    <div class="category-stats" id="category-stats"></div>
                 </div>
                 <div class="filter-row">
                     <button class="filter-chip active" id="filter-all" onclick="setExpenseFilter('all')">All</button>
                     <button class="filter-chip" id="filter-today" onclick="setExpenseFilter('today')">Today</button>
-                    <button class="filter-chip" id="filter-week" onclick="setExpenseFilter('week')">Week</button>
-                    <button class="filter-chip" id="filter-month" onclick="setExpenseFilter('month')">Month</button>
+                    <button class="filter-chip" id="filter-week" onclick="setExpenseFilter('week')">This Week</button>
+                    <button class="filter-chip" id="filter-month" onclick="setExpenseFilter('month')">This
+                        Month</button>
                 </div>
                 <div class="card">
-                    <div class="card-title">➕ New Expense</div>
+                    <div class="card-title">➕ Add New Expense</div>
                     <div class="inline-form">
                         <div class="form-group">
                             <label>Category</label>
@@ -794,6 +923,11 @@
                 </div>
                 <div class="card">
                     <div class="card-title">📋 Expenses List</div>
+                    <div style="margin-bottom: 16px;">
+                        <button class="export-btn" onclick="exportExpensesToCSV()">📥 Export CSV</button>
+                        <input type="text" id="expense-search" class="search-box" placeholder="Search expenses..."
+                            onkeyup="filterExpenses()" />
+                    </div>
                     <div id="expenses-list"></div>
                 </div>
             </div>
