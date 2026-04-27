@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
     populate_categories()
     yield
 
-app = FastAPI(title="PDIS API", lifespan=lifespan)
+app = FastAPI(title="FinPulse API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

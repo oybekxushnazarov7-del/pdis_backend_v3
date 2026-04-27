@@ -1,9 +1,9 @@
 const API_URL = window.location.origin;
 
-let accessToken = localStorage.getItem('pdis_access') || '';
-let refreshToken = localStorage.getItem('pdis_refresh') || '';
-let userEmail = localStorage.getItem('pdis_email') || '';
-let pendingVerificationEmail = localStorage.getItem('pdis_pending_verification_email') || '';
+let accessToken = localStorage.getItem('finpulse_access') || '';
+let refreshToken = localStorage.getItem('finpulse_refresh') || '';
+let userEmail = localStorage.getItem('finpulse_email') || '';
+let pendingVerificationEmail = localStorage.getItem('finpulse_pending_verification_email') || '';
 let resendCooldownSeconds = 0;
 let resendCooldownInterval = null;
 let expenseFilter = 'all';
