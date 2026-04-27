@@ -13,9 +13,16 @@ from app.db import get_connection
 from app.routes.users import auth_router, users_router
 from app.routes import expenses
 
-# Determine the root project directory
+# Determine the root project directory - more robust path handling
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# Debug: Log the paths being used
+print(f"BASE_DIR: {BASE_DIR}")
+print(f"STATIC_DIR: {STATIC_DIR}")
+print(f"STATIC_DIR exists: {os.path.exists(STATIC_DIR)}")
+if os.path.exists(STATIC_DIR):
+    print(f"Static files: {os.listdir(STATIC_DIR)}")
 
 def create_tables():
     try:
@@ -64,9 +71,37 @@ def create_tables():
     except Exception as e:
         print(f"Database error: {e}")
 
+def populate_categories():
+    categories = [
+        ('Food & Drinks', '🍔', 'Dining, groceries, and beverages'),
+        ('Transportation', '🚗', 'Fuel, public transport, and taxis'),
+        ('Shopping', '🛍️', 'Clothes, electronics, and personal items'),
+        ('Housing', '🏠', 'Rent, utilities, and maintenance'),
+        ('Entertainment', '🎬', 'Movies, games, and hobbies'),
+        ('Health', '💊', 'Medicine, gym, and doctor visits'),
+        ('Education', '📚', 'Courses, books, and tuition'),
+        ('Travel', '✈️', 'Flights, hotels, and sightseeing'),
+        ('Others', '📦', 'Miscellaneous expenses')
+    ]
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM categories")
+        if cursor.fetchone()[0] == 0:
+            cursor.executemany(
+                "INSERT INTO categories (name, emoji, description) VALUES (%s, %s, %s)",
+                categories
+            )
+            conn.commit()
+            print("Default categories populated.")
+        conn.close()
+    except Exception as e:
+        print(f"Error populating categories: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
+    populate_categories()
     yield
 
 app = FastAPI(title="PDIS API", lifespan=lifespan)
