@@ -424,15 +424,18 @@ function updateCategoryChart() {
     const ctx = document.getElementById('categoryChart');
     if (!ctx) return;
 
+    const container = ctx.parentElement;
     if (allExpenses.length === 0) {
         if (categoryChart) categoryChart.destroy();
-        // Show empty message in chart container
-        const container = ctx.parentElement;
         if (container) {
-            container.innerHTML = '<canvas id="categoryChart"></canvas><div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px;">No data for this user</div>';
+            container.innerHTML = '<canvas id="categoryChart"></canvas><div class="no-data-msg" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; pointer-events: none;">No data for this user</div>';
         }
         return;
     }
+
+    // Clear "No data" message if it exists
+    const msg = container.querySelector('.no-data-msg');
+    if (msg) msg.remove();
 
     const categories = {};
     allExpenses.forEach(exp => {
