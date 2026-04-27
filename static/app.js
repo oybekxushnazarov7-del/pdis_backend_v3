@@ -1,7 +1,9 @@
 // Auto-detect API URL based on environment
-const API_URL = ''; // Use relative paths since frontend is served by backend
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? '' 
+    : window.location.origin;
 
-let accessToken = localStorage.getItem('pdis_token') || '';
+let accessToken = localStorage.getItem('pdis_access') || '';
 let refreshToken = localStorage.getItem('pdis_refresh') || '';
 let userEmail = localStorage.getItem('pdis_email') || '';
 let pendingVerificationEmail = localStorage.getItem('pdis_pending_verification_email') || '';
