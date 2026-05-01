@@ -3,8 +3,9 @@ from datetime import datetime, timedelta
 import hashlib
 import os
 import random
-import smtplib
-from email.message import EmailMessage
+import json
+import urllib.request
+import urllib.error
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from app.db import get_connection
@@ -74,34 +75,39 @@ def _generate_verification_code() -> str:
 
 
 def _send_verification_email(email: str, code: str) -> None:
-    smtp_host = os.getenv("SMTP_HOST", "").strip()
-    smtp_user = os.getenv("SMTP_USER", "").strip()
-    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
-    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@pdis.local").strip()
-    smtp_port = int(os.getenv("SMTP_PORT", "587").strip())
-    smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").strip().lower() == "true"
+    api_key = os.getenv("BREVO_API_KEY", "").strip()
+    smtp_from = os.getenv("SMTP_FROM", "noreply@pdis.local").strip()
 
-    # Dev fallback: if SMTP is not configured, keep flow usable locally.
-    if not smtp_host or not smtp_user or not smtp_password:
+    # Dev fallback
+    if not api_key:
         print(f"[DEV] Email verification code for {email}: {code}")
         return
 
-    msg = EmailMessage()
-    msg["Subject"] = "PDIS Email Verification Code"
-    msg["From"] = smtp_from
-    msg["To"] = email
-    msg.set_content(
-        "Hello!\n\n"
-        f"Your PDIS verification code is: {code}\n"
-        "This code is valid for 5 minutes.\n\n"
-        "If you did not request this, please ignore this email."
-    )
-
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-        if smtp_use_tls:
-            server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.send_message(msg)
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
+    
+    payload = {
+        "sender": {"email": smtp_from, "name": "FinPulse Project"},
+        "to": [{"email": email}],
+        "subject": "FinPulse Email Verification Code",
+        "htmlContent": f"<p>Hello!</p><p>Your verification code is: <strong>{code}</strong></p><p>This code is valid for 5 minutes.</p><p>If you did not request this, please ignore this email.</p>"
+    }
+    
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            pass # Request succeeded
+    except urllib.error.HTTPError as e:
+        error_info = e.read().decode()
+        raise Exception(f"Brevo HTTP {e.code}: {error_info}")
+    except urllib.error.URLError as e:
+        raise Exception(f"Brevo Network Error: {e.reason}")
 
 
 def _send_verification_email_or_raise(email: str, code: str) -> None:
