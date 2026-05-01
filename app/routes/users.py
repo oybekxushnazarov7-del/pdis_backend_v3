@@ -74,12 +74,12 @@ def _generate_verification_code() -> str:
 
 
 def _send_verification_email(email: str, code: str) -> None:
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@pdis.local")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    smtp_host = os.getenv("SMTP_HOST", "").strip()
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@pdis.local").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "587").strip())
+    smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").strip().lower() == "true"
 
     # Dev fallback: if SMTP is not configured, keep flow usable locally.
     if not smtp_host or not smtp_user or not smtp_password:
@@ -107,10 +107,11 @@ def _send_verification_email(email: str, code: str) -> None:
 def _send_verification_email_or_raise(email: str, code: str) -> None:
     try:
         _send_verification_email(email, code)
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] SMTP Email failure: {str(e)}")
         raise HTTPException(
             status_code=503,
-            detail="Unable to send verification email. Check SMTP settings."
+            detail=f"Unable to send verification email. Check SMTP settings. Error: {str(e)}"
         )
 
 
