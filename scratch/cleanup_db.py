@@ -15,13 +15,10 @@ def cleanup():
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        print("Ma'lumotlar o'chirilmoqda...")
+        print("Ma'lumotlar o'chirilmoqda va IDlar reset qilinmoqda...")
         
-        # Foreign keylar borligi sababli tartib bilan o'chiramiz
-        # Avval xarajatlar, keyin sub-userlar, keyin asosiy accountlar
-        cursor.execute("DELETE FROM expenses")
-        cursor.execute("DELETE FROM users")
-        cursor.execute("DELETE FROM accounts")
+        # TRUNCATE ... RESTART IDENTITY barcha ma'lumotlarni o'chiradi va IDni 1 dan boshlaydi
+        cursor.execute("TRUNCATE TABLE expenses, users, accounts RESTART IDENTITY CASCADE")
         
         conn.commit()
         print("Barcha ma'lumotlar muvaffaqiyatli o'chirildi!")
