@@ -909,7 +909,7 @@ function togglePassword(id) {
 }
 
 // ================= ADMIN PLATFORM STATS LOGIC =================
-let spaAdminKey = localStorage.getItem('spaAdminKey') || null;
+let spaAdminKey = null; // No longer persistent
 let adminPollingInterval = null;
 let adminPreviousTotal = -1;
 
@@ -923,6 +923,7 @@ function initAdminTab() {
     } else {
         document.getElementById('admin-auth-container').style.display = 'block';
         document.getElementById('admin-data-container').style.display = 'none';
+        document.getElementById('spa-admin-password').value = '';
         document.getElementById('spa-admin-password').focus();
     }
 }
@@ -935,8 +936,7 @@ async function checkSpaAdminPassword() {
     const success = await fetchSpaAdminStats();
     
     if (success) {
-        fetchGlobalStats(); // Fetch global stats immediately on success
-        localStorage.setItem('spaAdminKey', spaAdminKey);
+        fetchGlobalStats();
         document.getElementById('admin-auth-container').style.display = 'none';
         document.getElementById('admin-data-container').style.display = 'block';
         document.getElementById('admin-error-msg').style.display = 'none';
@@ -944,7 +944,6 @@ async function checkSpaAdminPassword() {
     } else {
         document.getElementById('admin-error-msg').style.display = 'block';
         spaAdminKey = null;
-        localStorage.removeItem('spaAdminKey');
     }
 }
 
@@ -961,6 +960,8 @@ function stopAdminPolling() {
         clearInterval(adminPollingInterval);
         adminPollingInterval = null;
     }
+    // Clear password when leaving admin section
+    spaAdminKey = null; 
 }
 
 async function fetchSpaAdminStats() {

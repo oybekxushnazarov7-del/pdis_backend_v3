@@ -370,7 +370,7 @@ def get_site_stats(request: Request):
         cursor.execute(
             """
             SELECT id, name, email, 
-                   created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent' as created_at
+                   created_at + INTERVAL '5 hours' as created_at
             FROM accounts 
             WHERE email_verified = TRUE
             ORDER BY created_at DESC NULLS LAST, id DESC
