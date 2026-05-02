@@ -333,9 +333,23 @@ function doLogout() {
     accessToken = '';
     refreshToken = '';
     userEmail = '';
+    selectedUserId = null;
+    selectedUserName = null;
+    spaAdminKey = null;
+    
     localStorage.removeItem('pdis_access');
     localStorage.removeItem('pdis_refresh');
     localStorage.removeItem('pdis_email');
+    
+    // Clear admin session key so it asks again on next login
+    sessionStorage.removeItem('spaAdminKey');
+    
+    // Stop any active admin polling
+    stopAdminPolling();
+    
+    // Reset UI elements
+    document.getElementById('sidebar-email').textContent = 'guest@example.com';
+    
     showPage('page-login');
     showToast('Logged out successfully!');
 }
