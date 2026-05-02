@@ -349,6 +349,10 @@ function doLogout() {
     
     // Reset UI elements
     document.getElementById('sidebar-email').textContent = 'guest@example.com';
+    const contextBox = document.getElementById('user-context-box');
+    if (contextBox) contextBox.style.display = 'none';
+    const activeUserName = document.getElementById('active-user-name');
+    if (activeUserName) activeUserName.textContent = '';
     
     showPage('page-login');
     showToast('Logged out successfully!');
