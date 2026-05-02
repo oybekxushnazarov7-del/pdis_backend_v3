@@ -909,7 +909,7 @@ function togglePassword(id) {
 }
 
 // ================= ADMIN PLATFORM STATS LOGIC =================
-let spaAdminKey = null; // No longer persistent
+let spaAdminKey = sessionStorage.getItem('spaAdminKey') || null; 
 let adminPollingInterval = null;
 let adminPreviousTotal = -1;
 
@@ -936,6 +936,7 @@ async function checkSpaAdminPassword() {
     const success = await fetchSpaAdminStats();
     
     if (success) {
+        sessionStorage.setItem('spaAdminKey', spaAdminKey);
         fetchGlobalStats();
         document.getElementById('admin-auth-container').style.display = 'none';
         document.getElementById('admin-data-container').style.display = 'block';
@@ -944,6 +945,7 @@ async function checkSpaAdminPassword() {
     } else {
         document.getElementById('admin-error-msg').style.display = 'block';
         spaAdminKey = null;
+        sessionStorage.removeItem('spaAdminKey');
     }
 }
 
@@ -960,8 +962,6 @@ function stopAdminPolling() {
         clearInterval(adminPollingInterval);
         adminPollingInterval = null;
     }
-    // Clear password when leaving admin section
-    spaAdminKey = null; 
 }
 
 async function fetchSpaAdminStats() {
@@ -974,7 +974,7 @@ async function fetchSpaAdminStats() {
         
         if (response.status === 403) {
             spaAdminKey = null;
-            localStorage.removeItem('spaAdminKey');
+            sessionStorage.removeItem('spaAdminKey');
             stopAdminPolling();
             document.getElementById('admin-auth-container').style.display = 'block';
             document.getElementById('admin-data-container').style.display = 'none';
