@@ -354,6 +354,14 @@ function doLogout() {
     const activeUserName = document.getElementById('active-user-name');
     if (activeUserName) activeUserName.textContent = '';
     
+    // Proactively reset Admin UI to locked state
+    const adminAuth = document.getElementById('admin-auth-container');
+    const adminData = document.getElementById('admin-data-container');
+    if (adminAuth) adminAuth.style.display = 'block';
+    if (adminData) adminData.style.display = 'none';
+    const adminPwdInput = document.getElementById('spa-admin-password');
+    if (adminPwdInput) adminPwdInput.value = '';
+    
     showPage('page-login');
     showToast('Logged out successfully!');
 }
