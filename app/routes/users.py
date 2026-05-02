@@ -354,6 +354,121 @@ def refresh_token(data: RefreshRequest):
     return {"access_token": new_access_token, "token_type": "bearer"}
 
 
+@auth_router.get("/stats")
+def get_site_stats(request: Request):
+    # Admin tekshiruvi: faqat ADMIN_PASSWORD ni bilganlar kira oladi
+    admin_key = os.getenv("ADMIN_PASSWORD", "admin123")
+    client_key = request.headers.get("x-admin-key")
+    
+    if client_key != admin_key:
+        raise HTTPException(status_code=403, detail="Unauthorized! Incorrect password.")
+
+    # This endpoint allows retrieving information about registered accounts
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, name, email, created_at 
+            FROM accounts 
+            ORDER BY created_at DESC NULLS LAST, id DESC
+            """
+        )
+        rows = cursor.fetchall()
+        
+        users_list = []
+        for r in rows:
+            created_at = r[3]
+            # Handle null created_at for older users
+            if created_at is None:
+                 created_at_str = "Unknown"
+                 date_str = "Unknown"
+                 time_str = "Unknown"
+            else:
+                 created_at_str = created_at.isoformat()
+                 date_str = created_at.strftime("%Y-%m-%d")
+                 time_str = created_at.strftime("%H:%M:%S")
+
+            users_list.append({
+                "id": r[0],
+                "name": r[1],
+                "email": r[2],
+                "created_at": created_at_str,
+                "date": date_str,
+                "time": time_str
+            })
+
+        return {
+            "total_users": len(users_list),
+            "users": users_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    finally:
+        conn.close()
+
+@auth_router.get("/global-stats")
+def get_global_stats(request: Request):
+    admin_key = os.getenv("ADMIN_PASSWORD", "admin123")
+    client_key = request.headers.get("x-admin-key")
+    if client_key != admin_key:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # Total Money Spent ever
+        cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses")
+        total_spent = cursor.fetchone()[0]
+
+        # Total spent this month
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(amount), 0) FROM expenses 
+            WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+            """
+        )
+        month_spent = cursor.fetchone()[0]
+
+        # Expenses by category (Top 6)
+        cursor.execute(
+            """
+            SELECT category, COALESCE(SUM(amount), 0) as total
+            FROM expenses
+            GROUP BY category
+            ORDER BY total DESC
+            LIMIT 6
+            """
+        )
+        cat_rows = cursor.fetchall()
+        category_stats = [{"category": r[0], "total": r[1]} for r in cat_rows]
+
+        # Daily trend for the last 7 days
+        cursor.execute(
+            """
+            SELECT date(created_at) as dt, COALESCE(SUM(amount), 0)
+            FROM expenses
+            WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY date(created_at)
+            ORDER BY dt ASC
+            """
+        )
+        trend_rows = cursor.fetchall()
+        daily_trend = [{"date": str(r[0]), "total": r[1]} for r in trend_rows]
+
+        return {
+            "total_spent": total_spent,
+            "month_spent": month_spent,
+            "categories": category_stats,
+            "daily_trend": daily_trend
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    finally:
+        conn.close()
+
+
 # ==================== USERS ====================
 
 @users_router.post("/")

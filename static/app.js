@@ -13,6 +13,8 @@ let allExpenses = [];
 let trendChart = null;
 let categoryChart = null;
 let userCompareChart = null;
+let globalTrendChart = null;
+let globalCategoryChart = null;
 let selectedUserId = null;
 let selectedUserName = null;
 
@@ -80,6 +82,12 @@ async function showSection(name) {
     }
     if (name === 'home') await loadStats();
     if (name === 'report') await loadReport();
+    
+    if (name === 'admin') {
+        initAdminTab();
+    } else {
+        stopAdminPolling();
+    }
 }
 
 function toggleSidebar() {
@@ -899,3 +907,222 @@ function togglePassword(id) {
         btn.textContent = '👁️';
     }
 }
+
+// ================= ADMIN PLATFORM STATS LOGIC =================
+let spaAdminKey = localStorage.getItem('spaAdminKey') || null;
+let adminPollingInterval = null;
+let adminPreviousTotal = -1;
+
+function initAdminTab() {
+    if (spaAdminKey) {
+        document.getElementById('admin-auth-container').style.display = 'none';
+        document.getElementById('admin-data-container').style.display = 'block';
+        fetchSpaAdminStats();
+        fetchGlobalStats();
+        startAdminPolling();
+    } else {
+        document.getElementById('admin-auth-container').style.display = 'block';
+        document.getElementById('admin-data-container').style.display = 'none';
+        document.getElementById('spa-admin-password').focus();
+    }
+}
+
+async function checkSpaAdminPassword() {
+    const pwd = document.getElementById('spa-admin-password').value;
+    if (!pwd) return;
+
+    spaAdminKey = pwd;
+    const success = await fetchSpaAdminStats();
+    
+    if (success) {
+        fetchGlobalStats(); // Fetch global stats immediately on success
+        localStorage.setItem('spaAdminKey', spaAdminKey);
+        document.getElementById('admin-auth-container').style.display = 'none';
+        document.getElementById('admin-data-container').style.display = 'block';
+        document.getElementById('admin-error-msg').style.display = 'none';
+        startAdminPolling();
+    } else {
+        document.getElementById('admin-error-msg').style.display = 'block';
+        spaAdminKey = null;
+        localStorage.removeItem('spaAdminKey');
+    }
+}
+
+function startAdminPolling() {
+    stopAdminPolling();
+    adminPollingInterval = setInterval(() => {
+        fetchSpaAdminStats();
+        fetchGlobalStats();
+    }, 5000);
+}
+
+function stopAdminPolling() {
+    if (adminPollingInterval) {
+        clearInterval(adminPollingInterval);
+        adminPollingInterval = null;
+    }
+}
+
+async function fetchSpaAdminStats() {
+    try {
+        const response = await fetch(API_URL + '/auth/stats', {
+            headers: {
+                'x-admin-key': spaAdminKey
+            }
+        });
+        
+        if (response.status === 403) {
+            spaAdminKey = null;
+            localStorage.removeItem('spaAdminKey');
+            stopAdminPolling();
+            document.getElementById('admin-auth-container').style.display = 'block';
+            document.getElementById('admin-data-container').style.display = 'none';
+            return false;
+        }
+        
+        if (!response.ok) throw new Error("Network error");
+        
+        const data = await response.json();
+        updateAdminDashboard(data);
+        
+        const now = new Date();
+        document.getElementById('admin-last-updated').textContent = `Last updated: ${now.toLocaleTimeString()}`;
+        return true;
+    } catch (error) {
+        console.error("Error fetching admin stats:", error);
+        return false;
+    }
+}
+
+function updateAdminDashboard(data) {
+    const totalCountEl = document.getElementById('admin-total-users');
+    const todayCountEl = document.getElementById('admin-today-users');
+    const tbody = document.getElementById('admin-users-table');
+    
+    // Animation for update
+    if (adminPreviousTotal !== -1 && adminPreviousTotal !== data.total_users) {
+        totalCountEl.style.transform = 'scale(1.2)';
+        totalCountEl.style.color = 'var(--green)';
+        setTimeout(() => {
+            totalCountEl.style.transform = 'scale(1)';
+            totalCountEl.style.color = 'var(--accent)';
+        }, 300);
+    }
+    adminPreviousTotal = data.total_users;
+
+    totalCountEl.textContent = data.total_users;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let todayCount = 0;
+
+    if (data.users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 2rem; color: var(--muted);">No users yet.</td></tr>`;
+        todayCountEl.textContent = "0";
+        return;
+    }
+
+    let rowsHtml = '';
+    data.users.forEach((user) => {
+        let isNew = false;
+        if (user.date === todayStr) {
+            todayCount++;
+            isNew = true;
+        }
+
+        const statusBadge = isNew 
+            ? `<span style="background: rgba(67, 233, 123, 0.1); color: var(--green); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid rgba(67, 233, 123, 0.2);">New</span>` 
+            : `<span style="background: rgba(108, 99, 255, 0.1); color: var(--accent); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid rgba(108, 99, 255, 0.2);">Active</span>`;
+
+        rowsHtml += `
+            <tr style="transition: background 0.3s;">
+                <td style="color: var(--muted); font-family: monospace;">#${user.id}</td>
+                <td style="font-weight: 500;">${user.name}</td>
+                <td style="color: var(--muted);">${user.email}</td>
+                <td>${user.date}</td>
+                <td style="font-family: monospace; color: #e8e8f0;">${user.time}</td>
+                <td>${statusBadge}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = rowsHtml;
+    todayCountEl.textContent = todayCount;
+}
+
+// ================= GLOBAL ANALYTICS LOGIC =================
+async function fetchGlobalStats() {
+    if (!spaAdminKey) return false;
+    try {
+        const response = await fetch(API_URL + '/auth/global-stats', {
+            headers: { 'x-admin-key': spaAdminKey }
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        
+        // Update Metrics
+        document.getElementById('global-total-spent').textContent = data.total_spent.toLocaleString() + ' UZS';
+        document.getElementById('global-month-spent').textContent = data.month_spent.toLocaleString() + ' UZS';
+        
+        updateGlobalCharts(data);
+        return true;
+    } catch (e) {
+        console.error("Global stats error:", e);
+        return false;
+    }
+}
+
+function updateGlobalCharts(data) {
+    // 1. Global Category Chart
+    const catCtx = document.getElementById('globalCategoryChart');
+    if (catCtx) {
+        const labels = data.categories.map(c => c.category);
+        const values = data.categories.map(c => c.total);
+        const colors = ['#6c63ff', '#ff6584', '#43e97b', '#f1ab86', '#a8e6cf', '#ffd3b6'];
+
+        if (globalCategoryChart) globalCategoryChart.destroy();
+        globalCategoryChart = new Chart(catCtx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{ data: values, backgroundColor: colors }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { color: '#e8e8f0', font: { size: 10 } } } }
+            }
+        });
+    }
+
+    // 2. Global Trend Chart (Last 7 Days)
+    const trendCtx = document.getElementById('globalTrendChart');
+    if (trendCtx) {
+        const labels = data.daily_trend.map(t => t.date);
+        const values = data.daily_trend.map(t => t.total);
+
+        if (globalTrendChart) globalTrendChart.destroy();
+        globalTrendChart = new Chart(trendCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Platform Daily Spending',
+                    data: values,
+                    backgroundColor: 'rgba(108, 99, 255, 0.4)',
+                    borderColor: '#6c63ff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#7a7a9a' }, grid: { color: '#2a2a3a' } },
+                    x: { ticks: { color: '#7a7a9a' }, grid: { display: false } }
+                }
+            }
+        });
+    }
+}
+

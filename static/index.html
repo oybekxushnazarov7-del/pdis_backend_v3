@@ -849,6 +849,9 @@
                 <div class="nav-item" onclick="showSection('report')" id="nav-report">
                     <span>📊</span> Report
                 </div>
+                <div class="nav-item" onclick="showSection('admin')" id="nav-admin" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+                    <span>👑</span> Platform Stats
+                </div>
             </nav>
             <div id="user-context-box" style="margin-top: 16px; padding: 12px; border-radius: 12px; background: rgba(67, 233, 123, 0.1); border: 1px solid rgba(67, 233, 123, 0.2); display: none;">
                 <div style="font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Active Context</div>
@@ -990,6 +993,96 @@
                 <div class="card">
                     <div class="card-title">📋 Summary Table</div>
                     <div id="report-summary-list"></div>
+                </div>
+            </div>
+
+            <!-- PLATFORM STATS (ADMIN) -->
+            <div class="content-section" id="section-admin">
+                <div class="page-header">
+                    <h1 style="display: flex; align-items: center; gap: 10px;">
+                        <span class="live-indicator" style="display: inline-block; width: 12px; height: 12px; background-color: var(--green); border-radius: 50%; box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite;"></span>
+                        Platform Stats
+                    </h1>
+                    <p>Real-time overview of all registered accounts on FinPulse</p>
+                    <div id="admin-last-updated" style="color: var(--muted); font-size: 0.85rem; margin-top: 5px;"></div>
+                </div>
+
+                <div id="admin-auth-container" class="card" style="text-align: center; max-width: 400px; margin: 40px auto;">
+                    <div class="card-title">Admin Access Required</div>
+                    <p style="color: var(--muted); margin-bottom: 20px; font-size: 14px;">Please enter the admin password to view platform statistics.</p>
+                    <div class="form-group">
+                        <input type="password" id="spa-admin-password" placeholder="Admin Password" style="margin-bottom: 15px;" onkeypress="if(event.key === 'Enter') checkSpaAdminPassword()">
+                    </div>
+                    <button class="btn btn-primary" onclick="checkSpaAdminPassword()">Unlock Dashboard</button>
+                    <div id="admin-error-msg" style="color: var(--accent2); margin-top: 15px; font-size: 14px; display: none;">Incorrect password!</div>
+                </div>
+
+                <div id="admin-data-container" style="display: none;">
+                    <div class="stats-grid">
+                        <div class="stat-card" style="background: rgba(108, 99, 255, 0.05); border-color: rgba(108, 99, 255, 0.2);">
+                            <div class="stat-label">Total Registered Accounts</div>
+                            <div class="stat-value purple" id="admin-total-users" style="transition: all 0.3s ease;">-</div>
+                        </div>
+                        <div class="stat-card" style="background: rgba(67, 233, 123, 0.05); border-color: rgba(67, 233, 123, 0.2);">
+                            <div class="stat-label">Joined Today</div>
+                            <div class="stat-value green" id="admin-today-users">-</div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="overflow-x: auto;">
+                        <div class="card-title">📋 Registered Accounts Log</div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#ID</th>
+                                    <th>Account Name</th>
+                                    <th>Email Address</th>
+                                    <th>Registration Date</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-table">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--muted); padding: 30px;">Loading data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- GLOBAL ANALYTICS SECTION -->
+                    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);">
+                        <div class="page-header">
+                            <h2 style="font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 15px;">🌍 Global Analytics (Anonymized)</h2>
+                            <p>Overview of platform-wide financial activity across all users</p>
+                        </div>
+
+                        <div class="stats-grid">
+                            <div class="stat-card" style="background: linear-gradient(135deg, rgba(108, 99, 255, 0.1), rgba(155, 89, 182, 0.1));">
+                                <div class="stat-label">Platform Total Spent</div>
+                                <div class="stat-value purple" id="global-total-spent">0 UZS</div>
+                            </div>
+                            <div class="stat-card" style="background: linear-gradient(135deg, rgba(67, 233, 123, 0.1), rgba(46, 204, 113, 0.1));">
+                                <div class="stat-label">Platform This Month</div>
+                                <div class="stat-value green" id="global-month-spent">0 UZS</div>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 24px;">
+                            <div class="card">
+                                <div class="card-title">📉 Global Spending Trend (Last 7 Days)</div>
+                                <div class="chart-container" style="height: 250px;">
+                                    <canvas id="globalTrendChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">🍕 Popular Categories Across Platform</div>
+                                <div class="chart-container" style="height: 250px;">
+                                    <canvas id="globalCategoryChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
