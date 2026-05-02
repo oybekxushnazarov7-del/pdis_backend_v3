@@ -214,6 +214,7 @@ async function doLogin() {
             document.getElementById('login-email').value = '';
             document.getElementById('login-password').value = '';
             showPage('page-dashboard');
+            showSection('home');
             document.getElementById('sidebar-email').textContent = email;
             loadStats();
         } else {
@@ -1039,7 +1040,9 @@ function updateAdminDashboard(data) {
 
     totalCountEl.textContent = data.total_users;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    // Use local date (YYYY-MM-DD) instead of UTC to correctly identify "Today"
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
     let todayCount = 0;
 
     if (data.users.length === 0) {
@@ -1049,7 +1052,7 @@ function updateAdminDashboard(data) {
     }
 
     let rowsHtml = '';
-    data.users.forEach((user) => {
+    data.users.forEach((user, index) => {
         let isNew = false;
         if (user.date === todayStr) {
             todayCount++;
@@ -1062,7 +1065,7 @@ function updateAdminDashboard(data) {
 
         rowsHtml += `
             <tr style="transition: background 0.3s;">
-                <td style="color: var(--muted); font-family: monospace;">#${user.id}</td>
+                <td style="color: var(--muted); font-family: monospace;">#${index + 1}</td>
                 <td style="font-weight: 500;">${user.name}</td>
                 <td style="color: var(--muted);">${user.email}</td>
                 <td>${user.date}</td>
