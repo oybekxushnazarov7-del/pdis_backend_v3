@@ -522,15 +522,18 @@ async function loadUsers() {
 
         const html = `<table class="data-table">
             <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
-            <tbody id="users-tbody">${allUsers.map((u, i) => `<tr class="user-row" data-email="${u.email}">
-                <td class="num-cell">${i + 1}</td>
-                <td>${u.name}</td>
-                <td>${u.email}</td>
-                <td>
-                    <button class="export-btn" style="background: rgba(67, 233, 123, 0.1); color: var(--green); border-color: rgba(67, 233, 123, 0.2);" onclick="selectUser(${u.id}, '${u.name}')">🎯 Select</button>
-                    <button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button>
-                </td>
-            </tr>`).join('')}</tbody>
+            <tbody id="users-tbody">${allUsers.map((u, i) => {
+                const escapedName = u.name.replace(/'/g, "\\'");
+                return `<tr class="user-row" data-email="${u.email}">
+                    <td class="num-cell">${i + 1}</td>
+                    <td>${u.name}</td>
+                    <td>${u.email}</td>
+                    <td>
+                        <button class="export-btn" style="background: rgba(67, 233, 123, 0.1); color: var(--green); border-color: rgba(67, 233, 123, 0.2);" onclick="selectUser(${u.id}, '${escapedName}')">🎯 Select</button>
+                        <button class="btn-delete" onclick="deleteUser(${u.id})">🗑 Delete</button>
+                    </td>
+                </tr>`;
+            }).join('')}</tbody>
         </table>`;
         el.innerHTML = html;
     } catch (e) {
