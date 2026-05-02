@@ -1011,9 +1011,12 @@
                     <div class="card-title">Admin Access Required</div>
                     <p style="color: var(--muted); margin-bottom: 20px; font-size: 14px;">Please enter the admin password to view platform statistics.</p>
                     <div class="form-group">
-                        <input type="password" id="spa-admin-password" placeholder="Admin Password" style="margin-bottom: 15px;" onkeypress="if(event.key === 'Enter') checkSpaAdminPassword()">
+                        <div class="password-wrapper">
+                            <input type="password" id="spa-admin-password" placeholder="Admin Password" style="margin-bottom: 0;" onkeypress="if(event.key === 'Enter') checkSpaAdminPassword()">
+                            <button type="button" class="password-toggle" onclick="togglePassword('spa-admin-password')">👁️</button>
+                        </div>
                     </div>
-                    <button class="btn btn-primary" onclick="checkSpaAdminPassword()">Unlock Dashboard</button>
+                    <button class="btn btn-primary" onclick="checkSpaAdminPassword()" style="margin-top: 15px;">Unlock Dashboard</button>
                     <div id="admin-error-msg" style="color: var(--accent2); margin-top: 15px; font-size: 14px; display: none;">Incorrect password!</div>
                 </div>
 
