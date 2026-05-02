@@ -371,6 +371,7 @@ def get_site_stats(request: Request):
             """
             SELECT id, name, email, created_at 
             FROM accounts 
+            WHERE email_verified = TRUE
             ORDER BY created_at DESC NULLS LAST, id DESC
             """
         )
@@ -418,25 +419,37 @@ def get_global_stats(request: Request):
     try:
         cursor = conn.cursor()
         
-        # Total Money Spent ever
-        cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses")
-        total_spent = cursor.fetchone()[0]
-
-        # Total spent this month
+        # Total Money Spent ever (Verified accounts only)
         cursor.execute(
             """
-            SELECT COALESCE(SUM(amount), 0) FROM expenses 
-            WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+            SELECT COALESCE(SUM(e.amount), 0) 
+            FROM expenses e
+            JOIN accounts a ON e.account_id = a.id
+            WHERE a.email_verified = TRUE
+            """
+        )
+        total_spent = cursor.fetchone()[0]
+
+        # Total spent this month (Verified accounts only)
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(e.amount), 0) 
+            FROM expenses e
+            JOIN accounts a ON e.account_id = a.id
+            WHERE a.email_verified = TRUE 
+              AND date_trunc('month', e.created_at) = date_trunc('month', CURRENT_DATE)
             """
         )
         month_spent = cursor.fetchone()[0]
 
-        # Expenses by category (Top 6)
+        # Expenses by category (Top 6) (Verified accounts only)
         cursor.execute(
             """
-            SELECT category, COALESCE(SUM(amount), 0) as total
-            FROM expenses
-            GROUP BY category
+            SELECT e.category, COALESCE(SUM(e.amount), 0) as total
+            FROM expenses e
+            JOIN accounts a ON e.account_id = a.id
+            WHERE a.email_verified = TRUE
+            GROUP BY e.category
             ORDER BY total DESC
             LIMIT 6
             """
@@ -444,13 +457,15 @@ def get_global_stats(request: Request):
         cat_rows = cursor.fetchall()
         category_stats = [{"category": r[0], "total": r[1]} for r in cat_rows]
 
-        # Daily trend for the last 7 days
+        # Daily trend for the last 7 days (Verified accounts only)
         cursor.execute(
             """
-            SELECT date(created_at) as dt, COALESCE(SUM(amount), 0)
-            FROM expenses
-            WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-            GROUP BY date(created_at)
+            SELECT date(e.created_at) as dt, COALESCE(SUM(e.amount), 0)
+            FROM expenses e
+            JOIN accounts a ON e.account_id = a.id
+            WHERE a.email_verified = TRUE 
+              AND e.created_at >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY date(e.created_at)
             ORDER BY dt ASC
             """
         )
